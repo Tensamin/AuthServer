@@ -1,13 +1,13 @@
 {
-  "name": "authserver",
-  "version": "1.0.0",
-  "description": "",
-  "license": "ISC",
-  "author": "",
-  "type": "commonjs",
+  "name": "tensamin-authserver",
+  "version": "0.0.0",
+  "description": "Authentication server code for the Tensamin Project",
+  "license": "CC0-TENSAMIN",
+  "author": "Methanium",
+  "type": "module",
   "main": "app.js",
   "scripts": {
-    "dev": "node app.js"
+    "start": "node app.js"
   },
   "dependencies": {
     "dotenv": "^16.5.0",
