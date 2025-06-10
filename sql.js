@@ -1,5 +1,5 @@
-require('dotenv').config();
-let mysql = require('mysql2');
+import "dotenv/config";
+import mysql from 'mysql2';
 
 let connection = mysql.createConnection({
     host: process.env.DB_HOST + ":" + process.env.DB_PORT,
@@ -17,12 +17,15 @@ connection.connect(err => {
 
 await connection.execute(`
     CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY UNIQUE,
-        name VARCHAR(100),
+        uuid INT AUTO_INCREMENT PRIMARY KEY UNIQUE,
+        username VARCHAR(100) UNIQUE,
         email VARCHAR(100) UNIQUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        publicKey VARCHAR(128),
-        selfhostIP VARCHAR(128)
+        public_key VARCHAR(100),
+        private_key_hash VARCHAR(100),
+        token VARCHAR(100),
+        selfhost_ip VARCHAR(100),
+        selfhost_port VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
 `);
 console.log("Table 'users' ensured.");
