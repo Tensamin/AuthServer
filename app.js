@@ -1,7 +1,9 @@
 import express from 'express';
 import fs from 'fs';
 import { v7 } from 'uuid';
-import { decrypt_json_using_privkey } from './public/encryption.js';
+import { decrypt_json_using_privkey } from './encryption.js';
+import mysql from 'mysql2';
+import "dotenv/config";
 
 let publicKey = fs.readFileSync('public.pem', 'utf8');
 let privateKey = fs.readFileSync('private.pem', 'utf8');
@@ -15,6 +17,84 @@ class UserCreationProcess {
     constructor() {
         this.uuid = v7();
     }
+}
+
+
+let connection = mysql.createConnection({
+    host: process.env.DB_HOST + ":" + process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWD,
+    database: process.env.DB_USER
+});
+
+connection.connect(err => {
+    if (err) {
+        console.error('Error connecting: ', err.stack);
+    }
+    console.log('Connected');
+});
+
+await connection.execute(`
+    CREATE TABLE IF NOT EXISTS users (
+        uuid INT AUTO_INCREMENT PRIMARY KEY UNIQUE,
+        username VARCHAR(100) UNIQUE,
+        email VARCHAR(100) UNIQUE,
+        public_key VARCHAR(100),
+        private_key_hash VARCHAR(100),
+        token VARCHAR(100),
+        selfhost_ip VARCHAR(100),
+        selfhost_port VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+`);
+
+async function addUser(uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at) {
+    let query = `INSERT INTO users (uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    try {
+        let [result] = await connection.execute(
+            query,
+            [uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at,],
+        );
+        return result
+    } catch (error) {
+        console.log(error)
+        return error.message
+    }
+}
+
+async function usernameToUUID(username) {
+    let query = 'SELECT uuid FROM users WHERE username = ? LIMIT 1';
+    try {
+        let [result] = await connection.execute(
+            query,
+            [username],
+        );
+        return result
+    } catch (error) {
+        console.log(error)
+        return error.message
+    }
+}
+
+async function changeName(new_username, token) {
+    
+    // TOken Check
+    // Wenn TOken gut dann änder Username und mach neues Token
+    // Schick neues Token zurück
+  const updateQuery = `UPDATE users SET name = ? WHERE email = ?`;
+  const [result] = await connection.execute(updateQuery, [newName, email]);
+
+  console.log(`Updated ${result.affectedRows} row(s)`);
+}
+async function changeEmail(email, newEmail) {
+  const updateQuery = `UPDATE users SET email = ? WHERE email = ?`;
+  const [result] = await connection.execute(updateQuery, [newEmail, email]);
+
+  console.log(`Updated ${result.affectedRows} row(s)`);
+}
+
+function closeConnection(){
+    connection.end();
 }
 
 let users = {}
@@ -31,17 +111,40 @@ app.get('/api/create-user/servers-public-key', (req, res) => {
 })
 
 app.post('/api/create-user/finish', async (req, res) => {
-    let data = await decrypt_json_using_privkey(req.body, privateKey)
+    let data = await decrypt_json_using_privkey(req.body, privateKey);
     if ("uuid" in data &&
+        "username" in data &&
+        "email" in data &&
         "public_key" in data &&
         "private_key_hash" in data &&
-        "username" in data) {
-        users[data.uuid] = data;
-        res.send("Created User!")
+        "selfhost_ip" in data &&
+        "selfhost_port" in data) {
+        let tokenPart1 = v7();
+        let tokenPart2 = v7();
+        let tokenPart3 = v7();
+        let token = `${tokenPart1}${tokenPart2}${tokenPart3}`
+        console.log(token)
+        if (userCreations[data.uuid]) {
+            addUser(
+                data.uuid,
+                data.username,
+                data.email,
+                data.public_key,
+                data.private_key_hash,
+                token,
+                data.selfhost_ip,
+                data.selfhost_port,
+                new Date().getTime(),
+            );
+            delete userCreations[data.uuid];
+        } else {
+            res.send("UUID Invalid!");
+        }
+        res.send("Created User!");
     } else {
-        res.send("Missing Value!")
-    }
-})
+        res.send("Missing Value!");
+    };
+});
 
 app.post('/api/username-to-uuid', async (req, res) => {
     let data = await decrypt_json_using_privkey(req.body, privateKey);
@@ -70,4 +173,26 @@ app.post('/api/login', async (req, res) => {
 
 app.listen(port, () => {
     console.log(`> Started at http://0.0.0.0:${port} / https://auth-tensamin.methanium.net`);
+});
+
+process.on('exit', (code) => {
+    closeConnection()
+    console.log("Exiting: " + code)
+})
+
+process.on('uncaughtException', (err) => {
+    closeConnection()
+    console.log("Exiting: " + err)
+});
+
+process.on('SIGINT', () => {
+    closeConnection()
+    console.log("Exiting")
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    closeConnection()
+    console.log("Exiting")
+    process.exit(0);
 });

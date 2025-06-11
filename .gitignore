@@ -1,5 +1,6 @@
 .env
-node-modules/
+node_modules
 private.pem
 public.pem
 package-lock.json
+dev-database

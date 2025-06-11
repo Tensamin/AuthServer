@@ -1,0 +1,15 @@
+services:
+ dev-db:
+  image: mysql:latest
+  restart: always
+  env_file:
+   - .env
+  environment:
+   - MYSQL_DATABASE=${DB_NAME}
+   - MYSQL_USER=${DB_USER}
+   - MYSQL_PASSWORD=${DB_PASSWD}
+   - MYSQL_ROOT_PASSWORD=${DB_PASSWD}
+  ports:
+   - "3306:3306"
+  volumes:
+   - ./dev-database:/var/lib/mysql
