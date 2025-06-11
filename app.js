@@ -2,8 +2,8 @@ import express from 'express';
 import fs from 'fs';
 import { v7 } from 'uuid';
 import { decrypt_json_using_privkey } from './encryption.js';
-import mysql from 'mysql2';
 import "dotenv/config";
+import db from './sql.js'
 
 let publicKey = fs.readFileSync('public.pem', 'utf8');
 let privateKey = fs.readFileSync('private.pem', 'utf8');
@@ -20,33 +20,6 @@ class UserCreationProcess {
 }
 
 
-let connection = mysql.createConnection({
-    host: process.env.DB_HOST + ":" + process.env.DB_PORT,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWD,
-    database: process.env.DB_USER
-});
-
-connection.connect(err => {
-    if (err) {
-        console.error('Error connecting: ', err.stack);
-    }
-    console.log('Connected');
-});
-
-await connection.execute(`
-    CREATE TABLE IF NOT EXISTS users (
-        uuid INT AUTO_INCREMENT PRIMARY KEY UNIQUE,
-        username VARCHAR(100) UNIQUE,
-        email VARCHAR(100) UNIQUE,
-        public_key VARCHAR(100),
-        private_key_hash VARCHAR(100),
-        token VARCHAR(100),
-        selfhost_ip VARCHAR(100),
-        selfhost_port VARCHAR(100),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-`);
 
 async function addUser(uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at) {
     let query = `INSERT INTO users (uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -83,12 +56,6 @@ async function changeName(new_username, token) {
     // Schick neues Token zurück
   const updateQuery = `UPDATE users SET name = ? WHERE email = ?`;
   const [result] = await connection.execute(updateQuery, [newName, email]);
-
-  console.log(`Updated ${result.affectedRows} row(s)`);
-}
-async function changeEmail(email, newEmail) {
-  const updateQuery = `UPDATE users SET email = ? WHERE email = ?`;
-  const [result] = await connection.execute(updateQuery, [newEmail, email]);
 
   console.log(`Updated ${result.affectedRows} row(s)`);
 }
@@ -171,28 +138,36 @@ app.post('/api/login', async (req, res) => {
     };
 })
 
-app.listen(port, () => {
+app.listen(port, async () => {
+    await db.initDb();
+    console.log('\n--- All Users ---');
+    const allUsers = await db.getUsers();
+    allUsers.forEach(user => {
+      console.log(`ID: ${user.id}, Username: ${user.username}, Email: ${user.email}`);
+    });
+    console.log('-------------------\n');
     console.log(`> Started at http://0.0.0.0:${port} / https://auth-tensamin.methanium.net`);
 });
 
-process.on('exit', (code) => {
-    closeConnection()
-    console.log("Exiting: " + code)
-})
-
-process.on('uncaughtException', (err) => {
-    closeConnection()
-    console.log("Exiting: " + err)
-});
-
-process.on('SIGINT', () => {
-    closeConnection()
-    console.log("Exiting")
+async function gracefulShutdown() {
+    if (connection) {
+        try {
+            await connection.end();
+            console.log('Database connection closed.');
+        } catch (err) {
+            console.error('Error closing database connection:', err);
+        }
+        connection = null; // Prevent future use
+    }
     process.exit(0);
-});
+}
 
-process.on('SIGTERM', () => {
-    closeConnection()
-    console.log("Exiting")
-    process.exit(0);
+// Handle process termination signals
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
+
+// Handle uncaught exceptions
+process.on('uncaughtException', async (err) => {
+    console.error('Uncaught Exception:', err);
+    await gracefulShutdown();
 });
