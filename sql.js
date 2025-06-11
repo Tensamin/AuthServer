@@ -1,7 +1,5 @@
-const mysql = require('mysql2/promise');
-const dotenv = require('dotenv');
-
-dotenv.config();
+import mysql from 'mysql2/promise';
+import 'dotenv/config';
 
 let pool;
 
@@ -14,8 +12,8 @@ async function initDb() {
   try {
     pool = mysql.createPool({
       host: process.env.DB_HOST,
-      user: process.env.READWRITE_USER,
-      password: process.env.READWRITE_PASS,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWD,
       database: process.env.DB_NAME,
       port: process.env.DB_PORT,
       waitForConnections: true,
@@ -35,18 +33,18 @@ async function initDb() {
   }
 }
 
-/**
- * Creates the 'users' table if it does not already exist.
- * This is an internal helper function.
- */
 async function createUsersTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS users (
-      id INT AUTO_INCREMENT PRIMARY KEY,
+      uuid VARCHAR(36) NOT NULL PRIMARY KEY UNIQUE,
       username VARCHAR(255) NOT NULL UNIQUE,
       email VARCHAR(255) NOT NULL UNIQUE,
-      password VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      public_key TEXT NOT NULL,
+      private_key_hash VARCHAR(128) NOT NULL,
+      token VARCHAR(255) NOT NULL UNIQUE,
+      selfhost_ip VARCHAR(45) NOT NULL,
+      selfhost_port INT NOT NULL,
+      created_at VARCHAR(255) NOT NULL
     );
   `;
   try {
@@ -59,22 +57,16 @@ async function createUsersTable() {
   }
 }
 
-/**
- * Adds a new user to the database.
- * @param {string} username
- * @param {string} email
- * @param {string} password - In a real app, this should be a hashed password.
- * @returns {Promise<Object>} The result of the insert operation, including insertId.
- */
-async function addUser(username, email, password) {
-  const query = `
-    INSERT INTO users (username, email, password)
-    VALUES (?, ?, ?);
-  `;
+async function addUser(uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at) {
   try {
     const connection = await pool.getConnection();
-    const [result] = await connection.execute(query, [username, email, password]);
+    const [result] = await connection.execute(`
+    INSERT INTO users (uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+  `, [uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at]);
     connection.release();
+
+
     console.log(`User '${username}' added with ID: ${result.insertId}`);
     return result;
   } catch (error) {
@@ -83,33 +75,11 @@ async function addUser(username, email, password) {
   }
 }
 
-/**
- * Retrieves all users from the database.
- * @returns {Promise<Array>} An array of user objects.
- */
-async function getUsers() {
-  const query = `SELECT id, username, email, created_at FROM users;`;
+async function usernameToUUID(username) {
+  const query = `SELECT id, username, email, created_at FROM users WHERE username = ?;`;
   try {
     const connection = await pool.getConnection();
-    const [rows] = await connection.execute(query);
-    connection.release();
-    return rows;
-  } catch (error) {
-    console.error('Error getting users:', error);
-    throw error;
-  }
-}
-
-/**
- * Retrieves a user by their ID.
- * @param {number} id
- * @returns {Promise<Object|null>} The user object or null if not found.
- */
-async function getUserById(id) {
-  const query = `SELECT id, username, email, created_at FROM users WHERE id = ?;`;
-  try {
-    const connection = await pool.getConnection();
-    const [rows] = await connection.execute(query, [id]);
+    const [rows] = await connection.execute(query, [username]);
     connection.release();
     return rows.length > 0 ? rows[0] : null;
   } catch (error) {
@@ -118,84 +88,33 @@ async function getUserById(id) {
   }
 }
 
-/**
- * Updates an existing user's email and/or password by username.
- * You might want to update by ID in a real app.
- * @param {string} username The username of the user to update.
- * @param {Object} updates An object containing fields to update (e.g., { email: 'new@example.com', password: 'new_hashed_password' }).
- * @returns {Promise<Object>} The result of the update operation.
- */
-async function updateUser(username, updates) {
-  let query = 'UPDATE users SET ';
-  const params = [];
-  const updateParts = [];
-
-  if (updates.email) {
-    updateParts.push('email = ?');
-    params.push(updates.email);
-  }
-  if (updates.password) {
-    updateParts.push('password = ?');
-    params.push(updates.password);
-  }
-
-  if (updateParts.length === 0) {
-    console.warn('No fields provided for update.');
-    return { affectedRows: 0 };
-  }
-
-  query += updateParts.join(', ') + ' WHERE username = ?;';
-  params.push(username);
-
-  try {
-    const connection = await pool.getConnection();
-    const [result] = await connection.execute(query, params);
-    connection.release();
-    console.log(`User '${username}' updated. Affected rows: ${result.affectedRows}`);
-    return result;
-  } catch (error) {
-    console.error(`Error updating user '${username}':`, error);
-    throw error;
-  }
-}
-
-/**
- * Deletes a user from the database by their username.
- * @param {string} username The username of the user to delete.
- * @returns {Promise<Object>} The result of the delete operation.
- */
-async function deleteUser(username) {
-  const query = `DELETE FROM users WHERE username = ?;`;
-  try {
-    const connection = await pool.getConnection();
-    const [result] = await connection.execute(query, [username]);
-    connection.release();
-    console.log(`User '${username}' deleted. Affected rows: ${result.affectedRows}`);
-    return result;
-  } catch (error) {
-    console.error(`Error deleting user '${username}':`, error);
-    throw error;
-  }
-}
-
-/**
- * Closes the database connection pool.
- * Should be called when the application is shutting down.
- */
 async function closeDb() {
   if (pool) {
     await pool.end();
     console.log('Database connection pool closed.');
-    pool = null; // Clear pool reference
+    pool = null;
   }
 }
 
-module.exports = {
+export {
   initDb,
   addUser,
-  getUsers,
-  getUserById,
-  updateUser,
-  deleteUser,
-  closeDb // It's good practice to expose this for graceful shutdown
+  usernameToUUID,
+  closeDb,
 };
+
+/*
+async function addUser(uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at) {
+    let query = `INSERT INTO users (uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    try {
+        let [result] = await connection.execute(
+            query,
+            [uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at,],
+        );
+        return result
+    } catch (error) {
+        console.log(error)
+        return error.message
+    }
+}
+*/
