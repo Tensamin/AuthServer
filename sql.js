@@ -20,15 +20,10 @@ async function init() {
       connectionLimit: 10,
       queueLimit: 0,
     });
-    console.log('Database connection pool initialized.');
 
-    // Create the users table if it doesn't exist
     await createUsersTable();
-    console.log('Users table created or already exists.');
-
   } catch (error) {
     console.error('Failed to initialize database pool:', error);
-    // It's critical if DB connection fails, so re-throw or exit
     throw new Error('Database initialization failed.');
   }
 }
@@ -53,21 +48,22 @@ async function createUsersTable() {
     connection.release();
   } catch (error) {
     console.error('Error creating users table:', error);
-    throw error; // Re-throw to be caught by initDb or caller
+    throw error;
   }
 }
 
 async function addUser(uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at) {
   try {
     let connection = await pool.getConnection();
-    let [result] = await connection.execute(`
+    await connection.execute(`
     INSERT INTO users (uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
   `, [uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at]);
     connection.release();
-    return result;
+
+    return {success: true, message: "Created User"};
   } catch (error) {
-    return error.message
+    return {success: false, message: error.message};
   }
 }
 
@@ -95,6 +91,82 @@ async function removeUser(uuid, token) {
     };
 };
 
+async function changeUser_username(uuid, newValue) {
+  try {
+    let connection = await pool.getConnection();
+    let [res] = await connection.execute(`
+      UPDATE users SET username = ? WHERE uuid = ?  
+    `, [newValue, uuid]);
+    connection.release();
+
+    if (res.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: "Changed Username" }
+  } catch (error) {
+    return { success: false, message: error.message };
+  };
+};
+
+async function changeUser_email(uuid, newValue) {
+  try {
+    let connection = await pool.getConnection();
+    let [res] = await connection.execute(`
+      UPDATE users SET email = ? WHERE uuid = ?  
+    `, [newValue, uuid]);
+    connection.release();
+
+    if (res.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: "Changed Email" }
+  } catch (error) {
+    return { success: false, message: error.message };
+  };
+};
+
+async function changeUser_selfhost_ip(uuid, newValue) {
+  try {
+    let connection = await pool.getConnection();
+    let [res] = await connection.execute(`
+      UPDATE users SET selfhost_ip = ? WHERE uuid = ?  
+    `, [newValue, uuid]);
+    connection.release();
+
+    if (res.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: "Changed Selfhost IP" }
+  } catch (error) {
+    return { success: false, message: error.message };
+  };
+};
+
+async function changeUser_selfhost_port(uuid, newValue) {
+  try {
+    let connection = await pool.getConnection();
+    let [res] = await connection.execute(`
+      UPDATE users SET selfhost_port = ? WHERE uuid = ?  
+    `, [newValue, uuid]);
+    connection.release();
+
+    if (res.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: "Changed Selfhost Port" }
+  } catch (error) {
+    return { success: false, message: error.message };
+  };
+};
+
+async function changeUser_public_key_and_private_key_hash(uuid, token, newPublicKey, newPrivateKeyHash) {
+
+}
+
 async function usernameToUUID(username) {
   try {
     let connection = await pool.getConnection();
@@ -112,7 +184,7 @@ async function usernameToUUID(username) {
   };
 };
 
-async function closeDb() {
+async function close() {
   if (pool) {
     await pool.end();
     console.log('Database connection pool closed.');
@@ -120,30 +192,10 @@ async function closeDb() {
   }
 }
 
-function validate(input) {
-  return input.toLowerCase().replace(/[^a-z0-9.]/g, '');
-}
-
 export {
-  initDb,
+  init,
+  close,
   addUser,
+  removeUser,
   usernameToUUID,
-  closeDb,
-  validate,
 };
-
-/*
-async function addUser(uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at) {
-    let query = `INSERT INTO users (uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    try {
-        let [result] = await connection.execute(
-            query,
-            [uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at,],
-        );
-        return result
-    } catch (error) {
-        console.log(error)
-        return error.message
-    }
-}
-*/
