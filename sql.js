@@ -3,7 +3,7 @@ import 'dotenv/config';
 
 let pool;
 
-async function initDb() {
+async function init() {
   if (pool) {
     console.log('Database pool already initialized.');
     return;
@@ -34,7 +34,7 @@ async function initDb() {
 }
 
 async function createUsersTable() {
-  const createTableQuery = `
+  let createTableQuery = `
     CREATE TABLE IF NOT EXISTS users (
       uuid VARCHAR(36) NOT NULL PRIMARY KEY UNIQUE,
       username VARCHAR(255) NOT NULL UNIQUE,
@@ -48,7 +48,7 @@ async function createUsersTable() {
     );
   `;
   try {
-    const connection = await pool.getConnection();
+    let connection = await pool.getConnection();
     await connection.execute(createTableQuery);
     connection.release();
   } catch (error) {
@@ -59,34 +59,58 @@ async function createUsersTable() {
 
 async function addUser(uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at) {
   try {
-    const connection = await pool.getConnection();
-    const [result] = await connection.execute(`
+    let connection = await pool.getConnection();
+    let [result] = await connection.execute(`
     INSERT INTO users (uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
   `, [uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at]);
     connection.release();
-
-
-    console.log(`User '${username}' added with ID: ${result.insertId}`);
     return result;
   } catch (error) {
-    console.error(`Error adding user '${username}':`, error);
-    throw error; // Re-throw for caller to handle
+    return error.message
   }
 }
 
+async function removeUser(uuid, token) {
+    try {
+        let connection = await pool.getConnection();
+        let [rows] = await connection.execute(
+            'SELECT token FROM users WHERE uuid = ?',
+            [uuid]
+        );
+        connection.release();
+
+        if (rows.length === 0) {
+            return {success: false, message: 'UUID not found.'};
+        };
+
+        if (rows[0].token !== token) {
+            return {success: false, message: 'Bad Token'};
+        };
+
+        await connection.execute('DELETE FROM users WHERE uuid = ?', [uuid]);
+        return {success: true, message: "Deleted User"};
+    } catch (error) {
+        return {success: false, message: error.message};
+    };
+};
+
 async function usernameToUUID(username) {
-  const query = `SELECT id, username, email, created_at FROM users WHERE username = ?;`;
   try {
-    const connection = await pool.getConnection();
-    const [rows] = await connection.execute(query, [username]);
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(`SELECT uuid FROM users WHERE username = ?;`, [username]);
     connection.release();
-    return rows.length > 0 ? rows[0] : null;
+
+    if (rows.length === 0) {
+      return { success: false, message: 'Username not found.' };
+    };
+
+    return {success: true, message: rows[0].uuid}
+
   } catch (error) {
-    console.error(`Error getting user by ID ${id}:`, error);
-    throw error;
-  }
-}
+    return {success: false, message: error.message};
+  };
+};
 
 async function closeDb() {
   if (pool) {
@@ -96,11 +120,16 @@ async function closeDb() {
   }
 }
 
+function validate(input) {
+  return input.toLowerCase().replace(/[^a-z0-9.]/g, '');
+}
+
 export {
   initDb,
   addUser,
   usernameToUUID,
   closeDb,
+  validate,
 };
 
 /*

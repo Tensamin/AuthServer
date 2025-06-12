@@ -23,17 +23,13 @@ class UserCreationProcess {
     }
 }
 
-app.get('/api/create-user/start', (req, res) => {
+app.get('/api/register/init', (req, res) => {
     let newUser = new UserCreationProcess();
     userCreations[newUser.uuid] = newUser;
     res.send(newUser.uuid)
 })
 
-app.get('/api/create-user/servers-public-key', (req, res) => {
-    res.send(publicKey)
-})
-
-app.post('/api/create-user/finish', async (req, res) => {
+app.post('/api/register/complete', async (req, res) => {
     let data = await decrypt_json_using_privkey(req.body, privateKey);
     if ("uuid" in data &&
         "username" in data &&
@@ -69,16 +65,37 @@ app.post('/api/create-user/finish', async (req, res) => {
     };
 });
 
-app.post('/api/username-to-uuid', async (req, res) => {
-    let data = await decrypt_json_using_privkey(req.body, privateKey);
-    let uuid;
-    for (let user in users) {
-        if (users[user].username === data.username) {
-            uuid = users[user].uuid;
-        };
+app.get('/api/encryption/public-key', (req, res) => {
+    res.send(publicKey)
+})
+
+app.get('/api/encryption/js', (req, res) => {
+    res.sendFile('encryption.js')
+})
+
+app.post('/api/:user/uuid', async (req, res) => {
+    let user = db.validate(req.params.user);
+    let response;
+
+    try {
+        response = await db.usernameToUUID(user)
+        res.json(response)
+    } catch(err) {
+        res.status(505).json({success: false, message: err.message})
     }
-    res.send(uuid);
-});
+})
+
+app.post('/api/:user/uuid', async (req, res) => {
+    let user = db.validate(req.params.user);
+    let public_key;
+
+    try {
+        public_key = await db.get_public_key(user)
+        res.json({success: true, message: public_key})
+    } catch(err) {
+        res.status(505).json({success: false, message: err.message})
+    }
+})
 
 app.post('/api/login', async (req, res) => {
     let data = await decrypt_json_using_privkey(req.body, privateKey);
