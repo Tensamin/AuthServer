@@ -25,8 +25,8 @@ async function init() {
   } catch (error) {
     console.error('Failed to initialize database pool:', error);
     throw new Error('Database initialization failed.');
-  }
-}
+  };
+};
 
 async function createUsersTable() {
   let createTableQuery = `
@@ -49,8 +49,8 @@ async function createUsersTable() {
   } catch (error) {
     console.error('Error creating users table:', error);
     throw error;
-  }
-}
+  };
+};
 
 async function addUser(uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at) {
   try {
@@ -64,8 +64,8 @@ async function addUser(uuid, username, email, public_key, private_key_hash, toke
     return {success: true, message: "Created User"};
   } catch (error) {
     return {success: false, message: error.message};
-  }
-}
+  };
+};
 
 async function removeUser(uuid, token) {
     try {
@@ -164,8 +164,44 @@ async function changeUser_selfhost_port(uuid, newValue) {
 };
 
 async function changeUser_public_key_and_private_key_hash(uuid, token, newPublicKey, newPrivateKeyHash) {
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(
+      'SELECT token FROM users WHERE uuid = ?',
+      [uuid]
+    );
+    connection.release();
 
-}
+    if (rows.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    if (rows[0].token !== token) {
+      return { success: false, message: 'Bad Token' };
+    };
+
+    let tokenPart1 = v7();
+    let tokenPart2 = v7();
+    let tokenPart3 = v7();
+    let newToken = `${tokenPart1}.${tokenPart2}.${tokenPart3}`;
+
+    await connection.execute(`
+      UPDATE users SET token = ? WHERE uuid = ?  
+    `, [newToken, uuid]);
+
+    await connection.execute(`
+      UPDATE users SET public_key = ? WHERE uuid = ?  
+    `, [newPublicKey, uuid]);
+
+    await connection.execute(`
+      UPDATE users SET private_key_hash = ? WHERE uuid = ?  
+    `, [newPrivateKeyHash, uuid]);
+
+    return { success: true, message: newToken };
+  } catch (error) {
+    return { success: false, message: error.message };
+  };
+};
 
 async function usernameToUUID(username) {
   try {
@@ -177,7 +213,7 @@ async function usernameToUUID(username) {
       return { success: false, message: 'Username not found.' };
     };
 
-    return {success: true, message: rows[0].uuid}
+    return {success: true, message: rows[0].uuid};
 
   } catch (error) {
     return {success: false, message: error.message};
@@ -189,8 +225,9 @@ async function close() {
     await pool.end();
     console.log('Database connection pool closed.');
     pool = null;
-  }
-}
+    process.exit(0);
+  };
+};
 
 export {
   init,
@@ -198,4 +235,9 @@ export {
   addUser,
   removeUser,
   usernameToUUID,
+  changeUser_username,
+  changeUser_email,
+  changeUser_selfhost_ip,
+  changeUser_selfhost_port,
+  changeUser_public_key_and_private_key_hash,
 };
