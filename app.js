@@ -88,24 +88,24 @@ app.get('/api/register/init', (req, res) => {
 /* */ });
 /* */ // ENCRYPTED TRANSFER //
 
-app.post('/api/:user/uuid', async (req, res) => {
-    let user = db.validate(req.params.user);
+app.post('/api/:uuid/username', async (req, res) => {
+    let uuid = db.validate(req.params.uuid);
     let response;
 
     try {
-        response = await db.usernameToUUID(user)
+        response = await db.usernameToUUID(uuid)
         res.json(response)
     } catch(err) {
         res.status(505).json({success: false, message: err.message})
     }
 })
 
-app.post('/api/:user/public-key', async (req, res) => {
-    let user = db.validate(req.params.user);
+app.post('/api/:uuid/public-key', async (req, res) => {
+    let uuid = db.validate(req.params.uuid);
     let public_key;
 
     try {
-        public_key = await db.get_public_key(user)
+        public_key = await db.get_public_key(uuid)
         res.json({success: true, message: public_key})
     } catch(err) {
         res.status(505).json({success: false, message: err.message})

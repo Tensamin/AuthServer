@@ -203,17 +203,18 @@ async function changeUser_public_key_and_private_key_hash(uuid, token, newPublic
   };
 };
 
-async function usernameToUUID(username) {
+async function usernameToUUID(uuid) {
+  // Hier könnte Fehler mit rows[0] kommen weil nicht ganzer user sondern nur uuid selected wird (diese Funktion wurde noch nicht getestet)
   try {
     let connection = await pool.getConnection();
-    let [rows] = await connection.execute(`SELECT uuid FROM users WHERE username = ?;`, [username]);
+    let [rows] = await connection.execute(`SELECT username FROM users WHERE uuid = ?;`, [uuid]);
     connection.release();
 
     if (rows.length === 0) {
-      return { success: false, message: 'Username not found.' };
+      return { success: false, message: 'UUID not found.' };
     };
 
-    return {success: true, message: rows[0].uuid};
+    return {success: true, message: rows[0].username};
 
   } catch (error) {
     return {success: false, message: error.message};
