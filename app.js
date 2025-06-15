@@ -2,7 +2,6 @@
 import express from 'express';
 import fs from 'fs';
 import { v7 } from 'uuid';
-import { decrypt_json_using_privkey } from './encryption.js';
 import "dotenv/config";
 import * as db from './sql.js'
 import cors from "cors"
@@ -33,60 +32,53 @@ app.get('/api/register/init', (req, res) => {
     res.send(newUser.uuid)
 })
 
-/* */ // ENCRYPTED TRANSFER //
-/* */ app.post('/api/register/complete', async (req, res) => {
-/* */     let data = await decrypt_json_using_privkey(req.body, privateKey);
-/* */     if ("uuid" in data &&
-/* */         "username" in data &&
-/* */         "email" in data &&
-/* */         "public_key" in data &&
-/* */         "private_key_hash" in data &&
-/* */         "selfhost_ip" in data &&
-/* */         "selfhost_port" in data) {
-/* */ 
-/* */         let tokenPart1 = v7();
-/* */         let tokenPart2 = v7();
-/* */         let tokenPart3 = v7();
-/* */         let token = `${tokenPart1}.${tokenPart2}.${tokenPart3}`;
-/* */ 
-/* */         if (userCreations[data.uuid]) {
-/* */             db.addUser(
-/* */                 data.uuid,
-/* */                 data.username,
-/* */                 data.email,
-/* */                 data.public_key,
-/* */                 data.private_key_hash,
-/* */                 token,
-/* */                 data.selfhost_ip,
-/* */                 data.selfhost_port,
-/* */                 new Date().getTime(),
-/* */             );
-/* */             delete userCreations[data.uuid];
-/* */         } else {
-/* */             res.send("UUID Invalid!");
-/* */         }
-/* */         res.send("Created User!");
-/* */     } else {
-/* */         res.send("Missing Value!");
-/* */     };
-/* */ });
-/* */ // ENCRYPTED TRANSFER //
+app.post('/api/register/complete', async (req, res) => {
+    if ("uuid" in req.body &&
+        "username" in req.body &&
+        "email" in req.body &&
+        "public_key" in req.body &&
+        "private_key_hash" in req.body &&
+        "selfhost_ip" in req.body &&
+        "selfhost_port" in req.body) {
 
-/* */ // ENCRYPTED TRANSFER //
-/* */ app.post('/api/login', async (req, res) => {
-/* */     let data = await decrypt_json_using_privkey(req.body, privateKey);
-/* */ 
-/* */     if (users[data.uuid]) {
-/* */         if (users[data.uuid].private_key_hash === data.private_key_hash) {
-/* */             res.json({ success: true, message: "Private Key hash matches" });
-/* */         } else {
-/* */             res.json({ success: false, message: "Private Key hash does not match" });
-/* */         };
-/* */     } else {
-/* */         res.send({ success: false, message: "User does not exist" });
-/* */     };
-/* */ });
-/* */ // ENCRYPTED TRANSFER //
+        let tokenPart1 = v7();
+        let tokenPart2 = v7();
+        let tokenPart3 = v7();
+        let token = `${tokenPart1}.${tokenPart2}.${tokenPart3}`;
+
+        if (userCreations[req.body.uuid]) {
+            db.addUser(
+                req.body.uuid,
+                req.body.username,
+                req.body.email,
+                req.body.public_key,
+                req.body.private_key_hash,
+                token,
+                req.body.selfhost_ip,
+                req.body.selfhost_port,
+                new Date().getTime(),
+            );
+            delete userCreations[req.body.uuid];
+        } else {
+            res.send("UUID Invalid!");
+        }
+        res.send("Created User!");
+    } else {
+        res.send("Missing Value!");
+    };
+});
+
+app.post('/api/login', async (req, res) => {
+    if (users[req.body.uuid]) {
+        if (users[req.body.uuid].private_key_hash === req.body.private_key_hash) {
+            res.json({ success: true, message: "Private Key hash matches" });
+        } else {
+            res.json({ success: false, message: "Private Key hash does not match" });
+        };
+    } else {
+        res.send({ success: false, message: "User does not exist" });
+    };
+});
 
 app.post('/api/:uuid/username', async (req, res) => {
     let uuid = db.validate(req.params.uuid);
