@@ -3,9 +3,9 @@ import express from 'express';
 import fs from 'fs';
 import { v7 } from 'uuid';
 import "dotenv/config";
-import * as db from './sql.js'
-import cors from "cors"
-import { dirname } from "path"
+import * as db from './sql.js';
+import cors from "cors";
+import { dirname } from "path";
 import { fileURLToPath } from 'url';
 
 // Variables
@@ -13,94 +13,131 @@ let __filename = fileURLToPath(import.meta.url);
 let __dirname = dirname(__filename);
 let publicKey = fs.readFileSync('public.pem', 'utf8');
 let privateKey = fs.readFileSync('private.pem', 'utf8');
-let port = process.env.PORT || 9187
+let port = process.env.PORT || 9187;
 let app = express();
 let userCreations = {};
 
 // Environment
-app.use(cors())
-app.use(express.text());
+app.use(cors());
+app.use(express.json());
 
 // API Endpoints
-app.get('/api/register/init', (req, res) => {
+app.get('/api/register/init', async (req, res) => {
     class UserCreationProcess {
-        constructor() {this.uuid = v7()}
+        constructor() { this.uuid = v7() };
     };
 
     let newUser = new UserCreationProcess();
     userCreations[newUser.uuid] = newUser;
-    res.send(newUser.uuid)
-})
+    res.send(newUser.uuid);
+
+    setTimeout(() => {
+        if (userCreations[newUser.uuid]) {
+            delete userCreations[newUser.uuid];
+        };
+    }, 3600000);
+});
 
 app.post('/api/register/complete', async (req, res) => {
-    if ("uuid" in req.body &&
-        "username" in req.body &&
-        "email" in req.body &&
-        "public_key" in req.body &&
-        "private_key_hash" in req.body &&
-        "selfhost_ip" in req.body &&
-        "selfhost_port" in req.body) {
+    try {
+        if ("uuid" in req.body &&
+            "username" in req.body &&
+            "email" in req.body &&
+            "public_key" in req.body &&
+            "private_key_hash" in req.body &&
+            "selfhost_ip" in req.body &&
+            "selfhost_port" in req.body) {
 
-        let tokenPart1 = v7();
-        let tokenPart2 = v7();
-        let tokenPart3 = v7();
-        let token = `${tokenPart1}.${tokenPart2}.${tokenPart3}`;
+            let tokenPart1 = v7();
+            let tokenPart2 = v7();
+            let tokenPart3 = v7();
+            let token = `${tokenPart1}.${tokenPart2}.${tokenPart3}`;
 
-        if (userCreations[req.body.uuid]) {
-            db.addUser(
-                req.body.uuid,
-                req.body.username,
-                req.body.email,
-                req.body.public_key,
-                req.body.private_key_hash,
-                token,
-                req.body.selfhost_ip,
-                req.body.selfhost_port,
-                new Date().getTime(),
-            );
-            delete userCreations[req.body.uuid];
+            if (userCreations[req.body.uuid]) {
+                db.addUser(
+                    req.body.uuid,
+                    req.body.username,
+                    req.body.email,
+                    req.body.public_key,
+                    req.body.private_key_hash,
+                    token,
+                    req.body.selfhost_ip,
+                    req.body.selfhost_port,
+                    new Date().getTime(),
+                );
+                delete userCreations[req.body.uuid];
+            } else {
+                res.status(400).send({ success: false, message: "UUID Invalid" });
+            }
+            res.json({ success: true, message: "Created User" });
         } else {
-            res.send("UUID Invalid!");
-        }
-        res.send("Created User!");
-    } else {
-        res.send("Missing Value!");
-    };
+            res.status(400).send({ success: false, message: "Missing Value" });
+        };
+    } catch (err) {
+        res.status(500).send({ success: false, message: err.message })
+    }
 });
 
 app.post('/api/login', async (req, res) => {
-    if (users[req.body.uuid]) {
-        if (users[req.body.uuid].private_key_hash === req.body.private_key_hash) {
-            res.json({ success: true, message: "Private Key hash matches" });
+    try {
+        let data = req.body
+
+        if (data.uuid && data.private_key_hash) {
+            let private_key_hash_db = await db.get_private_key_hash(data.uuid)
+            if (private_key_hash_db.success) {
+                if (private_key_hash_db.message === data.private_key_hash) {
+                    res.json({ success: true, message: "Hash matches" })
+                } else {
+                    res.json({ success: false, message: "Hash does not match" })
+                }
+            } else {
+                res.status(500).send({ success: false, message: private_key_hash_db.message })
+            }
         } else {
-            res.json({ success: false, message: "Private Key hash does not match" });
-        };
-    } else {
-        res.send({ success: false, message: "User does not exist" });
-    };
+            res.json({ success: false, message: "Missing Value" })
+        }
+    } catch (err) {
+        res.status(500).send({ success: false, message: err.message })
+    }
 });
 
-app.post('/api/:uuid/username', async (req, res) => {
-    let uuid = db.validate(req.params.uuid);
-    let response;
+app.get('/api/uuid-for/:user', async (req, res) => {
+    let user = req.params.user;
 
     try {
-        response = await db.usernameToUUID(uuid)
-        res.json(response)
-    } catch(err) {
-        res.status(505).json({success: false, message: err.message})
+        res.json(await db.usernameToUUID(user))
+    } catch (err) {
+        res.status(505).json({ success: false, message: err.message })
     }
 })
 
-app.post('/api/:uuid/public-key', async (req, res) => {
-    let uuid = db.validate(req.params.uuid);
-    let public_key;
+app.get('/api/:uuid/username', async (req, res) => {
+    let uuid = req.params.uuid;
 
     try {
-        public_key = await db.get_public_key(uuid)
-        res.json({success: true, message: public_key})
-    } catch(err) {
-        res.status(505).json({success: false, message: err.message})
+        res.json(await db.UUIDtoUsername(uuid))
+    } catch (err) {
+        res.status(505).json({ success: false, message: err.message })
+    }
+})
+
+app.get('/api/:uuid/public-key', async (req, res) => {
+    let uuid = req.params.uuid;
+
+    try {
+        res.json(await db.get_public_key(uuid))
+    } catch (err) {
+        res.status(505).json({ success: false, message: err.message })
+    }
+})
+
+app.get('/api/:uuid/created-at', async (req, res) => {
+    let uuid = req.params.uuid;
+
+    try {
+        res.json(await db.get_created_at(uuid))
+    } catch (err) {
+        res.status(505).json({ success: false, message: err.message })
     }
 })
 

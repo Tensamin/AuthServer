@@ -22,8 +22,8 @@ async function init() {
     });
 
     await createUsersTable();
-  } catch (error) {
-    console.error('Failed to initialize database pool:', error);
+  } catch (err) {
+    console.error('Failed to initialize database pool:', err);
     throw new Error('Database initialization failed.');
   };
 };
@@ -46,9 +46,9 @@ async function createUsersTable() {
     let connection = await pool.getConnection();
     await connection.execute(createTableQuery);
     connection.release();
-  } catch (error) {
-    console.error('Error creating users table:', error);
-    throw error;
+  } catch (err) {
+    console.error('Error creating users table:', err);
+    throw err;
   };
 };
 
@@ -61,34 +61,34 @@ async function addUser(uuid, username, email, public_key, private_key_hash, toke
   `, [uuid, username, email, public_key, private_key_hash, token, selfhost_ip, selfhost_port, created_at]);
     connection.release();
 
-    return {success: true, message: "Created User"};
-  } catch (error) {
-    return {success: false, message: error.message};
+    return { success: true, message: "Created User" };
+  } catch (err) {
+    return { success: false, message: err.message };
   };
 };
 
 async function removeUser(uuid, token) {
-    try {
-        let connection = await pool.getConnection();
-        let [rows] = await connection.execute(
-            'SELECT token FROM users WHERE uuid = ?',
-            [uuid]
-        );
-        connection.release();
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(
+      'SELECT token FROM users WHERE uuid = ?',
+      [uuid]
+    );
+    connection.release();
 
-        if (rows.length === 0) {
-            return {success: false, message: 'UUID not found.'};
-        };
-
-        if (rows[0].token !== token) {
-            return {success: false, message: 'Bad Token'};
-        };
-
-        await connection.execute('DELETE FROM users WHERE uuid = ?', [uuid]);
-        return {success: true, message: "Deleted User"};
-    } catch (error) {
-        return {success: false, message: error.message};
+    if (rows.length === 0) {
+      return { success: false, message: 'UUID not found.' };
     };
+
+    if (rows[0].token !== token) {
+      return { success: false, message: 'Bad Token' };
+    };
+
+    await connection.execute('DELETE FROM users WHERE uuid = ?', [uuid]);
+    return { success: true, message: "Deleted User" };
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
 };
 
 async function changeUser_username(uuid, newValue) {
@@ -104,8 +104,8 @@ async function changeUser_username(uuid, newValue) {
     };
 
     return { success: true, message: "Changed Username" }
-  } catch (error) {
-    return { success: false, message: error.message };
+  } catch (err) {
+    return { success: false, message: err.message };
   };
 };
 
@@ -122,8 +122,8 @@ async function changeUser_email(uuid, newValue) {
     };
 
     return { success: true, message: "Changed Email" }
-  } catch (error) {
-    return { success: false, message: error.message };
+  } catch (err) {
+    return { success: false, message: err.message };
   };
 };
 
@@ -140,8 +140,8 @@ async function changeUser_selfhost_ip(uuid, newValue) {
     };
 
     return { success: true, message: "Changed Selfhost IP" }
-  } catch (error) {
-    return { success: false, message: error.message };
+  } catch (err) {
+    return { success: false, message: err.message };
   };
 };
 
@@ -158,8 +158,8 @@ async function changeUser_selfhost_port(uuid, newValue) {
     };
 
     return { success: true, message: "Changed Selfhost Port" }
-  } catch (error) {
-    return { success: false, message: error.message };
+  } catch (err) {
+    return { success: false, message: err.message };
   };
 };
 
@@ -198,13 +198,12 @@ async function changeUser_public_key_and_private_key_hash(uuid, token, newPublic
     `, [newPrivateKeyHash, uuid]);
 
     return { success: true, message: newToken };
-  } catch (error) {
-    return { success: false, message: error.message };
+  } catch (err) {
+    return { success: false, message: err.message };
   };
 };
 
-async function usernameToUUID(uuid) {
-  // Hier könnte Fehler mit rows[0] kommen weil nicht ganzer user sondern nur uuid selected wird (diese Funktion wurde noch nicht getestet)
+async function UUIDtoUsername(uuid) {
   try {
     let connection = await pool.getConnection();
     let [rows] = await connection.execute(`SELECT username FROM users WHERE uuid = ?;`, [uuid]);
@@ -214,10 +213,78 @@ async function usernameToUUID(uuid) {
       return { success: false, message: 'UUID not found.' };
     };
 
-    return {success: true, message: rows[0].username};
+    return { success: true, message: rows[0].username };
 
-  } catch (error) {
-    return {success: false, message: error.message};
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
+async function usernameToUUID(username) {
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(`SELECT uuid FROM users WHERE username = ?;`, [username]);
+    connection.release();
+
+    if (rows.length === 0) {
+      return { success: false, message: 'Username not found.' };
+    };
+
+    return { success: true, message: rows[0].uuid };
+
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
+async function get_created_at(uuid) {
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(`SELECT created_at FROM users WHERE uuid = ?;`, [uuid]);
+    connection.release();
+
+    if (rows.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: rows[0].created_at };
+
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
+async function get_public_key(uuid) {
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(`SELECT public_key FROM users WHERE uuid = ?;`, [uuid]);
+    connection.release();
+
+    if (rows.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: rows[0].public_key };
+
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
+async function get_private_key_hash(uuid) {
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(`SELECT private_key_hash FROM users WHERE uuid = ?;`, [uuid]);
+    connection.release();
+
+    if (rows.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: rows[0].private_key_hash };
+
+  } catch (err) {
+    return { success: false, message: err.message };
   };
 };
 
@@ -235,10 +302,14 @@ export {
   close,
   addUser,
   removeUser,
-  usernameToUUID,
   changeUser_username,
   changeUser_email,
   changeUser_selfhost_ip,
   changeUser_selfhost_port,
   changeUser_public_key_and_private_key_hash,
+  get_created_at,
+  get_public_key,
+  get_private_key_hash,
+  UUIDtoUsername,
+  usernameToUUID,
 };
