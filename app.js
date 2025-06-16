@@ -44,14 +44,17 @@ app.post('/api/register/complete', async (req, res) => {
             "username" in req.body &&
             "email" in req.body &&
             "public_key" in req.body &&
-            "private_key_hash" in req.body &&
-            "selfhost_ip" in req.body &&
-            "selfhost_port" in req.body) {
+            "private_key_hash" in req.body) {
 
             let tokenPart1 = v7();
             let tokenPart2 = v7();
             let tokenPart3 = v7();
             let token = `${tokenPart1}.${tokenPart2}.${tokenPart3}`;
+
+            let iotaPart1 = v7();
+            let iotaPart2 = v7();
+            let iotaPart3 = v7();
+            let iota = `${iotaPart1}.${iotaPart2}.${iotaPart3}`;
 
             if (userCreations[req.body.uuid]) {
                 db.addUser(
@@ -61,8 +64,7 @@ app.post('/api/register/complete', async (req, res) => {
                     req.body.public_key,
                     req.body.private_key_hash,
                     token,
-                    req.body.selfhost_ip,
-                    req.body.selfhost_port,
+                    iota,
                     new Date().getTime(),
                 );
                 delete userCreations[req.body.uuid];
@@ -84,9 +86,13 @@ app.post('/api/login', async (req, res) => {
 
         if (data.uuid && data.private_key_hash) {
             let private_key_hash_db = await db.get_private_key_hash(data.uuid)
+            let iota_communication_token = await db.get_iota_communication_token(data.uuid)
             if (private_key_hash_db.success) {
                 if (private_key_hash_db.message === data.private_key_hash) {
-                    res.json({ success: true, message: "Hash matches" })
+                    // SUccess
+                    res.json({ success: true, message: "Hash matches", data: {
+                        iota_communication_token: iota_communication_token
+                    } })
                 } else {
                     res.json({ success: false, message: "Hash does not match" })
                 }

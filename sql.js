@@ -37,8 +37,7 @@ async function createUsersTable() {
       public_key TEXT NOT NULL,
       private_key_hash VARCHAR(128) NOT NULL,
       token VARCHAR(255) NOT NULL UNIQUE,
-      selfhost_ip VARCHAR(45) NOT NULL,
-      selfhost_port INT NOT NULL,
+      iota_token VARCHAR(255) NOT NULL UNIQUE,
       created_at VARCHAR(255) NOT NULL
     );
   `;

@@ -204,19 +204,6 @@ async function sha256(message) {
     .join("");
 }
 
-async function getBrowserFingerprint() {
-  let fingerprint = await sha256(btoa(JSON.stringify({
-    userAgent: navigator.userAgent,
-    language: navigator.language,
-    screenResolution: `${window.screen.width} x ${window.screen.height}`,
-    colorDepth: window.screen.colorDepth,
-    platform: navigator.platform,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-  })));
-
-  return fingerprint;
-}
-
 async function encryptedFetch(url, method, data) {
     let pubkey;
 
@@ -256,13 +243,26 @@ async function createPasskey(userId) {
   return creds.id;
 }
 
-export {
+if (typeof module !== 'undefined' && module.exports) {
+  console.log('Loading Encryption Modules for NodeJS');
+  module.exports = {
+    sha256: sha256,
+    encrypt_base64_using_aes: encrypt_base64_using_aes,
+    createPasskey: createPasskey,
+    decrypt_base64_using_aes: decrypt_base64_using_aes,
+    encrypt_json_using_pubkey: encrypt_json_using_pubkey,
+    decrypt_json_using_privkey: decrypt_json_using_privkey,
+    encryptedFetch: encryptedFetch,
+  };
+} else {
+  console.log('Loading Encryption Modules for Browser');
+  window.encryption_module = {
     encrypt_base64_using_aes,
     decrypt_base64_using_aes,
     encrypt_json_using_pubkey,
     decrypt_json_using_privkey,
     sha256,
     encryptedFetch,
-    getBrowserFingerprint,
     createPasskey,
-};
+  }
+}
