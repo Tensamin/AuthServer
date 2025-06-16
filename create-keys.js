@@ -9,14 +9,13 @@ const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
   },
   privateKeyEncoding: {
     type: 'pkcs8',
-    format: 'pem' // No encryption
+    format: 'pem',
   },
 });
 
 console.log("Generated Public Key:", publicKey);
 console.log("Generated Private Key:", privateKey);
 
-// Save keys to files
 fs.writeFileSync('public.pem', publicKey);
 fs.writeFileSync('private.pem', privateKey);
 
