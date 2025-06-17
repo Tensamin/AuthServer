@@ -56,7 +56,8 @@ async function createOmikronUUIDsTable() {
   let createOmikronUUIDsTableQuery = `
     CREATE TABLE IF NOT EXISTS omikron_uuids (
       uuid VARCHAR(36) NOT NULL PRIMARY KEY UNIQUE,
-      identification VARCHAR(255) NOT NULL
+      identification VARCHAR(255) NOT NULL,
+      ip VARCHAR(45) NOT NULL
     );
   `;
   try {
