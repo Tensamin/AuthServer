@@ -22,6 +22,7 @@ async function init() {
     });
 
     await createUsersTable();
+    await createOmikronUUIDsTable();
   } catch (err) {
     console.error('Failed to initialize database pool:', err);
     throw new Error('Database initialization failed.');
@@ -44,6 +45,23 @@ async function createUsersTable() {
   try {
     let connection = await pool.getConnection();
     await connection.execute(createTableQuery);
+    connection.release();
+  } catch (err) {
+    console.error('Error creating users table:', err);
+    throw err;
+  };
+};
+
+async function createOmikronUUIDsTable() {
+  let createOmikronUUIDsTableQuery = `
+    CREATE TABLE IF NOT EXISTS omikron_uuids (
+      uuid VARCHAR(36) NOT NULL PRIMARY KEY UNIQUE,
+      identification VARCHAR(255) NOT NULL
+    );
+  `;
+  try {
+    let connection = await pool.getConnection();
+    await connection.execute(createOmikronUUIDsTableQuery);
     connection.release();
   } catch (err) {
     console.error('Error creating users table:', err);
@@ -304,6 +322,23 @@ async function get_iota_uuid(uuid) {
   };
 };
 
+async function get_omikron_uuids(uuid) {
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute('SELECT uuid FROM omikron_uuids WHERE uuid = ?;', [uuid]);
+    connection.release();
+
+    if (rows.length === 0) {
+      return { success: false, message: 'Permission Denied' };
+    };
+
+    return { success: true, message: rows[0].uuid };
+
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
 async function close() {
   if (pool) {
     await pool.end();
@@ -326,6 +361,7 @@ export {
   get_public_key,
   get_private_key_hash,
   get_iota_uuid,
+  get_omikron_uuids,
   UUIDtoUsername,
   usernameToUUID,
 };

@@ -87,9 +87,11 @@ app.post('/api/login', async (req, res) => {
             if (private_key_hash_db.success) {
                 if (private_key_hash_db.message === data.private_key_hash) {
                     // SUccess
-                    res.json({ success: true, message: "Hash matches", data: {
-                        iota_uuid: iota_uuid,
-                    } })
+                    res.json({
+                        success: true, message: "Hash matches", data: {
+                            iota_uuid: iota_uuid,
+                        }
+                    })
                 } else {
                     res.json({ success: false, message: "Hash does not match" })
                 }
@@ -131,6 +133,25 @@ app.get('/api/:uuid/public-key', async (req, res) => {
         res.json(await db.get_public_key(uuid))
     } catch (err) {
         res.status(505).json({ success: false, message: err.message })
+    }
+})
+
+app.get('/api/:uuid/iota-uuid', async (req, res) => {
+    let uuid = req.params.uuid;
+    if (req.headers.authorization) {
+        let omikron_exists = await db.get_omikron_uuids(req.headers.authorization)
+
+        if (omikron_exists.success) {
+            try {
+                res.json(await db.get_iota_uuid(uuid))
+            } catch (err) {
+                res.status(505).json({ success: false, message: err.message })
+            }
+        } else {
+            res.json({ success: false, message: "Permission Denied" })
+        }
+    } else {
+        res.status(403).json({ success: false, message: "Permission Denied" })
     }
 })
 
