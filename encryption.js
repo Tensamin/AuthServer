@@ -268,7 +268,7 @@ if (typeof module !== 'undefined' && module.exports) {
     createPasskey: createPasskey,
     decrypt_base64_using_aes: decrypt_base64_using_aes,
     encrypt_base64_using_pubkey: encrypt_base64_using_pubkey,
-    decrypt_json_using_privkey: decrypt_json_using_privkey,
+    decrypt_base64_using_privkey: decrypt_base64_using_privkey,
     encryptedFetch: encryptedFetch,
   };
 } else {
@@ -277,7 +277,7 @@ if (typeof module !== 'undefined' && module.exports) {
     encrypt_base64_using_aes,
     decrypt_base64_using_aes,
     encrypt_base64_using_pubkey,
-    decrypt_json_using_privkey,
+    decrypt_base64_using_privkey,
     sha256,
     encryptedFetch,
     createPasskey,
