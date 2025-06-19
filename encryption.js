@@ -212,6 +212,35 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
 }
 
 async function sign_data_using_privkey(dataToSign, privateKey) {
+  async function importPkcs8PrivateKey(base64PrivateKey) {
+    let pkcs8 = base64PrivateKey
+      .replace(/-----BEGIN PRIVATE KEY-----/g, "")
+      .replace(/-----END PRIVATE KEY-----/g, "")
+      .replace(/\s/g, "");
+
+    const binaryDer = atob(pkcs8);
+
+    const pkcs8Der = new Uint8Array(binaryDer.length);
+    for (let i = 0; i < binaryDer.length; i++) {
+      pkcs8Der[i] = binaryDer.charCodeAt(i);
+    }
+
+    const privateKey = await crypto.subtle.importKey(
+      "pkcs8",
+      pkcs8Der,
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        hash: { name: "SHA-256" },
+      },
+      true,
+      ["sign"]
+    );
+
+    return privateKey;
+  }
+
+  privateKey = await importPkcs8PrivateKey(privateKey)
+
   const encoder = new TextEncoder();
   const data = encoder.encode(dataToSign);
 
