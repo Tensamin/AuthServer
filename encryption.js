@@ -74,15 +74,20 @@ async function decrypt_base64_using_aes(base64EncryptedString, password) {
   return originalBase64String;
 }
 
-async function encrypt_json_using_pubkey(jsonData, pemPublicKey) {
+async function encrypt_base64_using_pubkey(base64String, pemPublicKey) {
   // Process public key
-  let pemHeader = "-----BEGIN PUBLIC KEY-----";
-  let pemFooter = "-----END PUBLIC KEY-----";
-  let pemContents = pemPublicKey.replace(pemHeader, "").replace(pemFooter, "").replace(/\s+/g, "");
-  let binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+  const pemHeader = "-----BEGIN PUBLIC KEY-----";
+  const pemFooter = "-----END PUBLIC KEY-----";
+  const pemContents = pemPublicKey
+    .replace(pemHeader, "")
+    .replace(pemFooter, "")
+    .replace(/\s+/g, "");
+  const binaryDer = Uint8Array.from(atob(pemContents), (c) =>
+    c.charCodeAt(0)
+  );
 
   // Import RSA public key
-  let rsaKey = await crypto.subtle.importKey(
+  const rsaKey = await crypto.subtle.importKey(
     "spki",
     binaryDer,
     { name: "RSA-OAEP", hash: "SHA-256" },
@@ -91,53 +96,62 @@ async function encrypt_json_using_pubkey(jsonData, pemPublicKey) {
   );
 
   // Generate AES key
-  let aesKey = await crypto.subtle.generateKey(
+  const aesKey = await crypto.subtle.generateKey(
     { name: "AES-GCM", length: 256 },
     true,
     ["encrypt"]
   );
 
   // Export raw AES key and encrypt with RSA
-  let rawAesKey = await crypto.subtle.exportKey("raw", aesKey);
-  let encryptedAesKey = await crypto.subtle.encrypt(
+  const rawAesKey = await crypto.subtle.exportKey("raw", aesKey);
+  const encryptedAesKey = await crypto.subtle.encrypt(
     { name: "RSA-OAEP" },
     rsaKey,
     rawAesKey
   );
 
-  // Encrypt JSON data with AES
-  let iv = crypto.getRandomValues(new Uint8Array(12));
-  let jsonBytes = new TextEncoder().encode(JSON.stringify(jsonData));
-  let encryptedData = await crypto.subtle.encrypt(
+  // Encrypt Base64 data with AES
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  // --- KEY CHANGE IS HERE ---
+  // Decode the Base64 input data into a byte array
+  const dataBytes = Uint8Array.from(atob(base64String), (c) => c.charCodeAt(0));
+  // ---
+
+  const encryptedData = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     aesKey,
-    jsonBytes
+    dataBytes // Use the decoded byte array
   );
 
   // Prepare output (combines RSA-encrypted AES key + IV + AES-encrypted data)
-  let payload = new Uint8Array(
-    encryptedAesKey.byteLength +
-    iv.byteLength +
-    encryptedData.byteLength
+  const payload = new Uint8Array(
+    encryptedAesKey.byteLength + iv.byteLength + encryptedData.byteLength
   );
 
   payload.set(new Uint8Array(encryptedAesKey), 0);
   payload.set(iv, encryptedAesKey.byteLength);
-  payload.set(new Uint8Array(encryptedData), encryptedAesKey.byteLength + iv.byteLength);
+  payload.set(
+    new Uint8Array(encryptedData),
+    encryptedAesKey.byteLength + iv.byteLength
+  );
 
   return btoa(String.fromCharCode(...payload));
 }
 
-async function decrypt_json_using_privkey(encryptedData, pemPrivateKey) {
+async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey) {
   // Process private key
-  let pemHeader = "-----BEGIN PRIVATE KEY-----";
-  let pemFooter = "-----END PRIVATE KEY-----";
-  let pemContents = pemPrivateKey.replace(pemHeader, "").replace(pemFooter, "").replace(/\s+/g, "");
-  let binaryKey = atob(pemContents);
-  let keyBuffer = new Uint8Array([...binaryKey].map(char => char.charCodeAt(0))).buffer;
+  const pemHeader = "-----BEGIN PRIVATE KEY-----";
+  const pemFooter = "-----END PRIVATE KEY-----";
+  const pemContents = pemPrivateKey
+    .replace(pemHeader, "")
+    .replace(pemFooter, "")
+    .replace(/\s+/g, "");
+  const keyBuffer = Uint8Array.from(atob(pemContents), (c) =>
+    c.charCodeAt(0)
+  ).buffer;
 
   // Import RSA private key
-  let cryptoKey = await crypto.subtle.importKey(
+  const cryptoKey = await crypto.subtle.importKey(
     "pkcs8",
     keyBuffer,
     { name: "RSA-OAEP", hash: "SHA-256" },
@@ -145,34 +159,32 @@ async function decrypt_json_using_privkey(encryptedData, pemPrivateKey) {
     ["decrypt"]
   );
 
-  // Get RSA key modulus length (in bytes)
-  let modulusLengthBytes = cryptoKey.algorithm.modulusLength / 8;
+  // Get RSA key modulus length (in bytes) to determine the AES key size
+  const modulusLengthBytes = cryptoKey.algorithm.modulusLength / 8;
 
-  // Decode base64 payload
-  let rawPayload = atob(encryptedData);
-  let payload = new Uint8Array(rawPayload.length);
-  for (let i = 0; i < rawPayload.length; i++) {
-    payload[i] = rawPayload.charCodeAt(i);
-  }
+  // Decode base64 payload into a byte array
+  const payload = Uint8Array.from(atob(base64EncryptedString), (c) =>
+    c.charCodeAt(0)
+  );
 
   // Extract components from payload
   if (payload.length < modulusLengthBytes + 12) {
     throw new Error("Invalid payload: too short");
   }
 
-  let encryptedAesKey = payload.subarray(0, modulusLengthBytes);
-  let iv = payload.subarray(modulusLengthBytes, modulusLengthBytes + 12);
-  let ciphertext = payload.subarray(modulusLengthBytes + 12);
+  const encryptedAesKey = payload.subarray(0, modulusLengthBytes);
+  const iv = payload.subarray(modulusLengthBytes, modulusLengthBytes + 12);
+  const ciphertext = payload.subarray(modulusLengthBytes + 12);
 
   // Decrypt AES key with RSA private key
-  let rawAesKey = await crypto.subtle.decrypt(
+  const rawAesKey = await crypto.subtle.decrypt(
     { name: "RSA-OAEP" },
     cryptoKey,
     encryptedAesKey
   );
 
   // Import decrypted AES key
-  let aesKey = await crypto.subtle.importKey(
+  const aesKey = await crypto.subtle.importKey(
     "raw",
     rawAesKey,
     { name: "AES-GCM" },
@@ -181,17 +193,22 @@ async function decrypt_json_using_privkey(encryptedData, pemPrivateKey) {
   );
 
   // Decrypt data with AES
-  let decryptedData = await crypto.subtle.decrypt(
+  const decryptedData = await crypto.subtle.decrypt(
     {
       name: "AES-GCM",
-      iv: iv
+      iv: iv,
     },
     aesKey,
     ciphertext
   );
 
-  // Return parsed JSON
-  return JSON.parse(new TextDecoder().decode(decryptedData));
+  // --- KEY CHANGE IS HERE ---
+  // Convert the decrypted bytes (ArrayBuffer) back to a Base64 string
+  const decryptedBinaryString = String.fromCharCode(
+    ...new Uint8Array(decryptedData)
+  );
+  return btoa(decryptedBinaryString);
+  // ---
 }
 
 async function sha256(message) {
@@ -250,7 +267,7 @@ if (typeof module !== 'undefined' && module.exports) {
     encrypt_base64_using_aes: encrypt_base64_using_aes,
     createPasskey: createPasskey,
     decrypt_base64_using_aes: decrypt_base64_using_aes,
-    encrypt_json_using_pubkey: encrypt_json_using_pubkey,
+    encrypt_base64_using_pubkey: encrypt_base64_using_pubkey,
     decrypt_json_using_privkey: decrypt_json_using_privkey,
     encryptedFetch: encryptedFetch,
   };
@@ -259,7 +276,7 @@ if (typeof module !== 'undefined' && module.exports) {
   window.encryption_module = {
     encrypt_base64_using_aes,
     decrypt_base64_using_aes,
-    encrypt_json_using_pubkey,
+    encrypt_base64_using_pubkey,
     decrypt_json_using_privkey,
     sha256,
     encryptedFetch,
