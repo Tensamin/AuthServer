@@ -211,6 +211,46 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
   // ---
 }
 
+async function sign_data_using_privkey(dataToSign, privateKey) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(dataToSign);
+
+  const signature = await window.crypto.subtle.sign(
+    {
+      name: "RSASSA-PKCS1-V1_5",
+      hash: "SHA-256",
+    },
+    privateKey,
+    data
+  );
+
+  return btoa(String.fromCharCode(...new Uint8Array(signature)));
+}
+
+async function verify_signed_data_using_pubkey(originalData, base64Signature, publicKey) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(originalData);
+  const signature = new Uint8Array(
+    atob(base64Signature).split("").map((char) => char.charCodeAt(0))
+  );
+
+  try {
+    const isValid = await window.crypto.subtle.verify(
+      {
+        name: "RSASSA-PKCS1-V1_5",
+        hash: "SHA-256",
+      },
+      publicKey,
+      signature,
+      data
+    );
+    return isValid;
+  } catch (error) {
+    console.error("Error during signature verification:", error);
+    return false;
+  }
+}
+
 async function sha256(message) {
   let encoder = new TextEncoder();
   let data = encoder.encode(message);
@@ -219,28 +259,6 @@ async function sha256(message) {
   return Array.from(new Uint8Array(hashBuffer))
     .map(byte => byte.toString(16).padStart(2, "0"))
     .join("");
-}
-
-async function encryptedFetch(url, method, data) {
-    let pubkey;
-
-    await fetch(endpoint.public_key)
-    .then(response => response.text())
-    .then(data => {
-        pubkey = data;
-    });
-
-    let finalData = await encrypt_json_using_pubkey(data, pubkey)
-
-    let response = await fetch(url, {
-        method: method,
-        headers: {
-          'Content-Type': 'text/plain'
-        },
-        body: finalData,
-    });
-
-    return response;
 }
 
 async function createPasskey(userId) {
@@ -269,7 +287,8 @@ if (typeof module !== 'undefined' && module.exports) {
     decrypt_base64_using_aes: decrypt_base64_using_aes,
     encrypt_base64_using_pubkey: encrypt_base64_using_pubkey,
     decrypt_base64_using_privkey: decrypt_base64_using_privkey,
-    encryptedFetch: encryptedFetch,
+    sign_data_using_privkey: sign_data_using_privkey,
+    verify_signed_data_using_pubkey: verify_signed_data_using_pubkey,
   };
 } else {
   console.log('Loading Encryption Modules for Browser');
@@ -279,7 +298,8 @@ if (typeof module !== 'undefined' && module.exports) {
     encrypt_base64_using_pubkey,
     decrypt_base64_using_privkey,
     sha256,
-    encryptedFetch,
     createPasskey,
+    sign_data_using_privkey,
+    verify_signed_data_using_pubkey,
   }
 }
