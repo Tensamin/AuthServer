@@ -313,9 +313,9 @@ async function createPasskey(userId) {
 
   localStorage.setItem(
     "passkeyCredentialId",
-    bufferToBase64(credential.rawId)
+    credential.rawId.toString("base64")
   );
-  
+
   return creds.id;
 }
 
