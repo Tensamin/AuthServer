@@ -313,7 +313,7 @@ async function createPasskey(userId) {
 
   localStorage.setItem(
     "passkey_id",
-    btoa(String.fromCharCode(...new Uint8Array(creds.rawId))),
+    creds.id,
   );
 
   return creds.id;
