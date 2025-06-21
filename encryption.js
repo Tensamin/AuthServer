@@ -319,6 +319,37 @@ async function createPasskey(userId) {
   return creds.id;
 }
 
+async function getDerivedKey(passkey_id) {
+  const keyDerivationSalt = new TextEncoder().encode(
+    "FKejx100snc1WF_rM"
+  );
+
+  try {
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: keyDerivationSalt,
+        allowCredentials: [
+          {
+            type: "public-key",
+            id: passkey_id,
+          },
+        ],
+        userVerification: "required",
+      },
+    });
+
+    const signature = assertion.response.signature;
+
+    const derivedKey = await window.crypto.subtle.digest(
+      "SHA-256",
+      signature
+    );
+    return derivedKey;
+  } catch (err) {
+    throw new Error(`Could not get signature: ${err.message}`);
+  }
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   console.log('Loading Encryption Modules for NodeJS');
   module.exports = {
@@ -330,6 +361,7 @@ if (typeof module !== 'undefined' && module.exports) {
     decrypt_base64_using_privkey: decrypt_base64_using_privkey,
     sign_data_using_privkey: sign_data_using_privkey,
     verify_signed_data_using_pubkey: verify_signed_data_using_pubkey,
+    getDerivedKey: getDerivedKey,
   };
 } else {
   console.log('Loading Encryption Modules for Browser');
@@ -342,5 +374,6 @@ if (typeof module !== 'undefined' && module.exports) {
     createPasskey,
     sign_data_using_privkey,
     verify_signed_data_using_pubkey,
+    getDerivedKey,
   }
 }
