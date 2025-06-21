@@ -313,7 +313,7 @@ async function createPasskey(userId) {
 
   localStorage.setItem(
     "passkeyCredentialId",
-    credential.rawId.toString("base64")
+    creds.rawId.toString("base64")
   );
 
   return creds.id;
