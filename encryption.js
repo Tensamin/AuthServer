@@ -296,14 +296,26 @@ async function createPasskey(userId) {
       challenge: btoa("alar"),
       rp: { name: "Tensamin" },
       user: {
-        id: btoa(userId),
+        id: userId,
         name: userId,
-        displayName: ""
+        displayName: "Tensamin",
       },
-      pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-    }
+      pubKeyCredParams: [{ type: "public-key", alg: -7 }], // ES256
+      authenticatorSelection: {
+        authenticatorAttachment: "platform",
+        requireResidentKey: true,
+        userVerification: "required",
+      },
+      timeout: 60000,
+      attestation: "none",
+    },
   });
 
+  localStorage.setItem(
+    "passkeyCredentialId",
+    bufferToBase64(credential.rawId)
+  );
+  
   return creds.id;
 }
 
