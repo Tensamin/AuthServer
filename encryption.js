@@ -76,18 +76,18 @@ async function decrypt_base64_using_aes(base64EncryptedString, password) {
 
 async function encrypt_base64_using_pubkey(base64String, pemPublicKey) {
   // Process public key
-  const pemHeader = "-----BEGIN PUBLIC KEY-----";
-  const pemFooter = "-----END PUBLIC KEY-----";
-  const pemContents = pemPublicKey
+  let pemHeader = "-----BEGIN PUBLIC KEY-----";
+  let pemFooter = "-----END PUBLIC KEY-----";
+  let pemContents = pemPublicKey
     .replace(pemHeader, "")
     .replace(pemFooter, "")
     .replace(/\s+/g, "");
-  const binaryDer = Uint8Array.from(atob(pemContents), (c) =>
+  let binaryDer = Uint8Array.from(atob(pemContents), (c) =>
     c.charCodeAt(0)
   );
 
   // Import RSA public key
-  const rsaKey = await crypto.subtle.importKey(
+  let rsaKey = await crypto.subtle.importKey(
     "spki",
     binaryDer,
     { name: "RSA-OAEP", hash: "SHA-256" },
@@ -96,35 +96,35 @@ async function encrypt_base64_using_pubkey(base64String, pemPublicKey) {
   );
 
   // Generate AES key
-  const aesKey = await crypto.subtle.generateKey(
+  let aesKey = await crypto.subtle.generateKey(
     { name: "AES-GCM", length: 256 },
     true,
     ["encrypt"]
   );
 
   // Export raw AES key and encrypt with RSA
-  const rawAesKey = await crypto.subtle.exportKey("raw", aesKey);
-  const encryptedAesKey = await crypto.subtle.encrypt(
+  let rawAesKey = await crypto.subtle.exportKey("raw", aesKey);
+  let encryptedAesKey = await crypto.subtle.encrypt(
     { name: "RSA-OAEP" },
     rsaKey,
     rawAesKey
   );
 
   // Encrypt Base64 data with AES
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+  let iv = crypto.getRandomValues(new Uint8Array(12));
   // --- KEY CHANGE IS HERE ---
   // Decode the Base64 input data into a byte array
-  const dataBytes = Uint8Array.from(atob(base64String), (c) => c.charCodeAt(0));
+  let dataBytes = Uint8Array.from(atob(base64String), (c) => c.charCodeAt(0));
   // ---
 
-  const encryptedData = await crypto.subtle.encrypt(
+  let encryptedData = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     aesKey,
     dataBytes // Use the decoded byte array
   );
 
   // Prepare output (combines RSA-encrypted AES key + IV + AES-encrypted data)
-  const payload = new Uint8Array(
+  let payload = new Uint8Array(
     encryptedAesKey.byteLength + iv.byteLength + encryptedData.byteLength
   );
 
@@ -140,18 +140,18 @@ async function encrypt_base64_using_pubkey(base64String, pemPublicKey) {
 
 async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey) {
   // Process private key
-  const pemHeader = "-----BEGIN PRIVATE KEY-----";
-  const pemFooter = "-----END PRIVATE KEY-----";
-  const pemContents = pemPrivateKey
+  let pemHeader = "-----BEGIN PRIVATE KEY-----";
+  let pemFooter = "-----END PRIVATE KEY-----";
+  let pemContents = pemPrivateKey
     .replace(pemHeader, "")
     .replace(pemFooter, "")
     .replace(/\s+/g, "");
-  const keyBuffer = Uint8Array.from(atob(pemContents), (c) =>
+  let keyBuffer = Uint8Array.from(atob(pemContents), (c) =>
     c.charCodeAt(0)
   ).buffer;
 
   // Import RSA private key
-  const cryptoKey = await crypto.subtle.importKey(
+  let cryptoKey = await crypto.subtle.importKey(
     "pkcs8",
     keyBuffer,
     { name: "RSA-OAEP", hash: "SHA-256" },
@@ -160,10 +160,10 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
   );
 
   // Get RSA key modulus length (in bytes) to determine the AES key size
-  const modulusLengthBytes = cryptoKey.algorithm.modulusLength / 8;
+  let modulusLengthBytes = cryptoKey.algorithm.modulusLength / 8;
 
   // Decode base64 payload into a byte array
-  const payload = Uint8Array.from(atob(base64EncryptedString), (c) =>
+  let payload = Uint8Array.from(atob(base64EncryptedString), (c) =>
     c.charCodeAt(0)
   );
 
@@ -172,19 +172,19 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
     throw new Error("Invalid payload: too short");
   }
 
-  const encryptedAesKey = payload.subarray(0, modulusLengthBytes);
-  const iv = payload.subarray(modulusLengthBytes, modulusLengthBytes + 12);
-  const ciphertext = payload.subarray(modulusLengthBytes + 12);
+  let encryptedAesKey = payload.subarray(0, modulusLengthBytes);
+  let iv = payload.subarray(modulusLengthBytes, modulusLengthBytes + 12);
+  let ciphertext = payload.subarray(modulusLengthBytes + 12);
 
   // Decrypt AES key with RSA private key
-  const rawAesKey = await crypto.subtle.decrypt(
+  let rawAesKey = await crypto.subtle.decrypt(
     { name: "RSA-OAEP" },
     cryptoKey,
     encryptedAesKey
   );
 
   // Import decrypted AES key
-  const aesKey = await crypto.subtle.importKey(
+  let aesKey = await crypto.subtle.importKey(
     "raw",
     rawAesKey,
     { name: "AES-GCM" },
@@ -193,7 +193,7 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
   );
 
   // Decrypt data with AES
-  const decryptedData = await crypto.subtle.decrypt(
+  let decryptedData = await crypto.subtle.decrypt(
     {
       name: "AES-GCM",
       iv: iv,
@@ -204,7 +204,7 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
 
   // --- KEY CHANGE IS HERE ---
   // Convert the decrypted bytes (ArrayBuffer) back to a Base64 string
-  const decryptedBinaryString = String.fromCharCode(
+  let decryptedBinaryString = String.fromCharCode(
     ...new Uint8Array(decryptedData)
   );
   return btoa(decryptedBinaryString);
@@ -218,14 +218,14 @@ async function sign_data_using_privkey(dataToSign, privateKey) {
       .replace(/-----END PRIVATE KEY-----/g, "")
       .replace(/\s/g, "");
 
-    const binaryDer = atob(pkcs8);
+    let binaryDer = atob(pkcs8);
 
-    const pkcs8Der = new Uint8Array(binaryDer.length);
+    let pkcs8Der = new Uint8Array(binaryDer.length);
     for (let i = 0; i < binaryDer.length; i++) {
       pkcs8Der[i] = binaryDer.charCodeAt(i);
     }
 
-    const privateKey = await crypto.subtle.importKey(
+    let privateKey = await crypto.subtle.importKey(
       "pkcs8",
       pkcs8Der,
       {
@@ -241,10 +241,10 @@ async function sign_data_using_privkey(dataToSign, privateKey) {
 
   privateKey = await importPkcs8PrivateKey(privateKey)
 
-  const encoder = new TextEncoder();
-  const data = encoder.encode(dataToSign);
+  let encoder = new TextEncoder();
+  let data = encoder.encode(dataToSign);
 
-  const signature = await window.crypto.subtle.sign(
+  let signature = await window.crypto.subtle.sign(
     {
       name: "RSASSA-PKCS1-V1_5",
       hash: "SHA-256",
@@ -257,14 +257,14 @@ async function sign_data_using_privkey(dataToSign, privateKey) {
 }
 
 async function verify_signed_data_using_pubkey(originalData, base64Signature, publicKey) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(originalData);
-  const signature = new Uint8Array(
+  let encoder = new TextEncoder();
+  let data = encoder.encode(originalData);
+  let signature = new Uint8Array(
     atob(base64Signature).split("").map((char) => char.charCodeAt(0))
   );
 
   try {
-    const isValid = await window.crypto.subtle.verify(
+    let isValid = await window.crypto.subtle.verify(
       {
         name: "RSASSA-PKCS1-V1_5",
         hash: "SHA-256",
@@ -320,14 +320,10 @@ async function createPasskey(userId) {
 }
 
 async function getDerivedKey(passkey_id) {
-  const keyDerivationSalt = new TextEncoder().encode(
-    "FKejx100snc1WF_rM"
-  );
-
   try {
-    const assertion = await navigator.credentials.get({
+    let creds = await navigator.credentials.get({
       publicKey: {
-        challenge: keyDerivationSalt,
+        challenge: btoa("alar"),
         allowCredentials: [
           {
             type: "public-key",
@@ -338,12 +334,9 @@ async function getDerivedKey(passkey_id) {
       },
     });
 
-    const signature = assertion.response.signature;
+    let signature = creds.response.signature;
 
-    const derivedKey = await window.crypto.subtle.digest(
-      "SHA-256",
-      signature
-    );
+    let derivedKey = await sha256(signature);
     return derivedKey;
   } catch (err) {
     throw new Error(`Could not get signature: ${err.message}`);
