@@ -139,27 +139,18 @@ async function encrypt_base64_using_pubkey(base64String, pemPublicKey) {
 }
 
 async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey) {
-  console.log("--- Starting decrypt_base64_using_privkey ---");
-  console.log("Input base64EncryptedString length:", base64EncryptedString.length);
-  // Be cautious logging the full private key in a production environment
-  // console.log("Input pemPrivateKey (first 50 chars):", pemPrivateKey.substring(0, 50) + "...");
-
-  // Process private key
   let pemHeader = "-----BEGIN PRIVATE KEY-----";
   let pemFooter = "-----END PRIVATE KEY-----";
   let pemContents = pemPrivateKey
     .replace(pemHeader, "")
     .replace(pemFooter, "")
     .replace(/\s+/g, "");
-  console.log("PEM Contents length (after cleaning):", pemContents.length);
 
   let keyBuffer = Uint8Array.from(atob(pemContents), (c) =>
     c.charCodeAt(0)
   ).buffer;
-  console.log("keyBuffer ArrayBuffer length (bytes):", keyBuffer.byteLength);
 
   try {
-    // Import RSA private key
     let cryptoKey = await crypto.subtle.importKey(
       "pkcs8",
       keyBuffer,
@@ -167,41 +158,16 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
       true,
       ["decrypt"]
     );
-    console.log("RSA Private Key imported successfully.");
-    console.log("cryptoKey algorithm:", cryptoKey.algorithm.name, "modulusLength:", cryptoKey.algorithm.modulusLength);
 
-    // --- FIX/ADJUSTMENT 1: Handle modulusLengthBytes calculation ---
     let modulusLengthBits = cryptoKey.algorithm.modulusLength;
-    if (modulusLengthBits % 8 !== 0) {
-      // This warning indicates a potentially non-standard or malformed key.
-      // Standard RSA key sizes are multiples of 8 (e.g., 1024, 2048, 4096 bits).
-      console.warn(
-        `Warning: RSA modulusLength (${modulusLengthBits} bits) is not a multiple of 8. ` +
-        `This is unusual and might cause issues. Rounding up to the nearest byte.`
-      );
-    }
-    // Calculate modulus length in bytes, ensuring it's an integer by rounding up
-    let modulusLengthBytes = Math.ceil(modulusLengthBits / 8);
-    console.log("RSA Modulus Length (bytes, adjusted):", modulusLengthBytes);
-    // --- END FIX/ADJUSTMENT 1 ---
 
-    // Decode base64 payload into a byte array
+    let modulusLengthBytes = Math.ceil(modulusLengthBits / 8);
+
     let payload = Uint8Array.from(atob(base64EncryptedString), (c) =>
       c.charCodeAt(0)
     );
-    console.log("Payload length (after base64 decode):", payload.length);
 
-    // Extract components from payload
-    // Ensure the payload has enough bytes for the encrypted AES key + IV + at least some ciphertext
-    // RSA-OAEP padded message size is typically `modulusLengthBytes`.
-    // The IV for AES-GCM is always 12 bytes.
     if (payload.length < modulusLengthBytes + 12) {
-      console.error(
-        "Error: Invalid payload: too short. Expected at least",
-        modulusLengthBytes + 12,
-        "bytes, got",
-        payload.length
-      );
       throw new Error("Invalid payload: too short");
     }
 
@@ -209,24 +175,12 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
     let iv = payload.subarray(modulusLengthBytes, modulusLengthBytes + 12);
     let ciphertext = payload.subarray(modulusLengthBytes + 12);
 
-    console.log("Encrypted AES Key length (should match modulusLengthBytes):", encryptedAesKey.length);
-    console.log("IV length:", iv.length);
-    console.log("Ciphertext length:", ciphertext.length);
-
-    // Decrypt AES key with RSA private key
-    console.log("Attempting to decrypt AES key with RSA-OAEP...");
     let rawAesKey = await crypto.subtle.decrypt(
       { name: "RSA-OAEP" },
       cryptoKey,
       encryptedAesKey
     );
-    console.log("AES Key decrypted successfully. Raw AES Key length (bytes):", rawAesKey.byteLength);
-    // You might want to log a slice of the rawAesKey (e.g., first 4 bytes) for debugging
-    // console.log("Raw AES Key (first 4 bytes):", new Uint8Array(rawAesKey).slice(0,4));
 
-
-    // Import decrypted AES key
-    console.log("Attempting to import decrypted AES key as AES-GCM...");
     let aesKey = await crypto.subtle.importKey(
       "raw",
       rawAesKey,
@@ -234,10 +188,6 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
       true,
       ["decrypt"]
     );
-    console.log("AES Key imported successfully for AES-GCM.");
-
-    // Decrypt data with AES
-    console.log("Attempting to decrypt data with AES-GCM...");
     let decryptedData = await crypto.subtle.decrypt(
       {
         name: "AES-GCM",
@@ -246,23 +196,13 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
       aesKey,
       ciphertext
     );
-    console.log("Data decrypted successfully. Decrypted Data length (bytes):", decryptedData.byteLength);
 
-    // --- FIX/ADJUSTMENT 2: Correctly decode the decrypted data to UTF-8 string ---
-    // Assuming the original plain text was a UTF-8 string.
-    // If it was raw binary, you might want to return the ArrayBuffer or a Uint8Array.
-    console.log("Converting decrypted ArrayBuffer to UTF-8 string using TextDecoder...");
     const textDecoder = new TextDecoder("utf-8");
     let finalResult = textDecoder.decode(decryptedData);
-    console.log("Final decrypted string (first 100 chars):", finalResult.substring(0, 100) + (finalResult.length > 100 ? "..." : ""));
-    console.log("--- decrypt_base64_using_privkey finished successfully ---");
     return finalResult;
-    // --- END FIX/ADJUSTMENT 2 ---
 
   } catch (error) {
-    console.error("An operation error occurred during decryption:", error.name, error.message);
-    console.error("Error stack:", error.stack);
-    throw error; // Re-throw the error so the caller knows something went wrong
+    throw error;
   }
 }
 
