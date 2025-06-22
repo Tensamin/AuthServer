@@ -170,9 +170,20 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
     console.log("RSA Private Key imported successfully.");
     console.log("cryptoKey algorithm:", cryptoKey.algorithm.name, "modulusLength:", cryptoKey.algorithm.modulusLength);
 
-    // Get RSA key modulus length (in bytes) to determine the AES key size
-    let modulusLengthBytes = cryptoKey.algorithm.modulusLength / 8;
-    console.log("RSA Modulus Length (bytes):", modulusLengthBytes);
+    // --- FIX/ADJUSTMENT 1: Handle modulusLengthBytes calculation ---
+    let modulusLengthBits = cryptoKey.algorithm.modulusLength;
+    if (modulusLengthBits % 8 !== 0) {
+      // This warning indicates a potentially non-standard or malformed key.
+      // Standard RSA key sizes are multiples of 8 (e.g., 1024, 2048, 4096 bits).
+      console.warn(
+        `Warning: RSA modulusLength (${modulusLengthBits} bits) is not a multiple of 8. ` +
+        `This is unusual and might cause issues. Rounding up to the nearest byte.`
+      );
+    }
+    // Calculate modulus length in bytes, ensuring it's an integer by rounding up
+    let modulusLengthBytes = Math.ceil(modulusLengthBits / 8);
+    console.log("RSA Modulus Length (bytes, adjusted):", modulusLengthBytes);
+    // --- END FIX/ADJUSTMENT 1 ---
 
     // Decode base64 payload into a byte array
     let payload = Uint8Array.from(atob(base64EncryptedString), (c) =>
@@ -181,8 +192,16 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
     console.log("Payload length (after base64 decode):", payload.length);
 
     // Extract components from payload
+    // Ensure the payload has enough bytes for the encrypted AES key + IV + at least some ciphertext
+    // RSA-OAEP padded message size is typically `modulusLengthBytes`.
+    // The IV for AES-GCM is always 12 bytes.
     if (payload.length < modulusLengthBytes + 12) {
-      console.error("Error: Invalid payload: too short. Expected at least", modulusLengthBytes + 12, "bytes, got", payload.length);
+      console.error(
+        "Error: Invalid payload: too short. Expected at least",
+        modulusLengthBytes + 12,
+        "bytes, got",
+        payload.length
+      );
       throw new Error("Invalid payload: too short");
     }
 
@@ -190,7 +209,7 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
     let iv = payload.subarray(modulusLengthBytes, modulusLengthBytes + 12);
     let ciphertext = payload.subarray(modulusLengthBytes + 12);
 
-    console.log("Encrypted AES Key length:", encryptedAesKey.length);
+    console.log("Encrypted AES Key length (should match modulusLengthBytes):", encryptedAesKey.length);
     console.log("IV length:", iv.length);
     console.log("Ciphertext length:", ciphertext.length);
 
@@ -229,20 +248,17 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
     );
     console.log("Data decrypted successfully. Decrypted Data length (bytes):", decryptedData.byteLength);
 
-    // --- ORIGINAL KEY CHANGE SECTION ---
-    // Convert the decrypted bytes (ArrayBuffer) back to a Base64 string
-    console.log("Attempting to convert decrypted data to binary string for btoa...");
-    let decryptedBinaryString = String.fromCharCode(
-      ...new Uint8Array(decryptedData)
-    );
-    console.log("Binary string length:", decryptedBinaryString.length);
-
-    console.log("Attempting to btoa (Base64 encode) the decrypted binary string...");
-    let finalResult = btoa(decryptedBinaryString);
-    console.log("Final Base64 result length:", finalResult.length);
+    // --- FIX/ADJUSTMENT 2: Correctly decode the decrypted data to UTF-8 string ---
+    // Assuming the original plain text was a UTF-8 string.
+    // If it was raw binary, you might want to return the ArrayBuffer or a Uint8Array.
+    console.log("Converting decrypted ArrayBuffer to UTF-8 string using TextDecoder...");
+    const textDecoder = new TextDecoder("utf-8");
+    let finalResult = textDecoder.decode(decryptedData);
+    console.log("Final decrypted string (first 100 chars):", finalResult.substring(0, 100) + (finalResult.length > 100 ? "..." : ""));
     console.log("--- decrypt_base64_using_privkey finished successfully ---");
     return finalResult;
-    // ---
+    // --- END FIX/ADJUSTMENT 2 ---
+
   } catch (error) {
     console.error("An operation error occurred during decryption:", error.name, error.message);
     console.error("Error stack:", error.stack);
