@@ -203,11 +203,9 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
   );
 
   // --- KEY CHANGE IS HERE ---
-  // Convert the decrypted bytes (ArrayBuffer) back to a Base64 string
-  let decryptedBinaryString = String.fromCharCode(
-    ...new Uint8Array(decryptedData)
-  );
-  return btoa(decryptedBinaryString);
+  // Convert the decrypted ArrayBuffer to a UTF-8 string
+  const textDecoder = new TextDecoder("utf-8");
+  return textDecoder.decode(decryptedData);
   // ---
 }
 
