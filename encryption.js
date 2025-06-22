@@ -139,6 +139,11 @@ async function encrypt_base64_using_pubkey(base64String, pemPublicKey) {
 }
 
 async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey) {
+  console.log("--- Starting decrypt_base64_using_privkey ---");
+  console.log("Input base64EncryptedString length:", base64EncryptedString.length);
+  // Be cautious logging the full private key in a production environment
+  // console.log("Input pemPrivateKey (first 50 chars):", pemPrivateKey.substring(0, 50) + "...");
+
   // Process private key
   let pemHeader = "-----BEGIN PRIVATE KEY-----";
   let pemFooter = "-----END PRIVATE KEY-----";
@@ -146,67 +151,103 @@ async function decrypt_base64_using_privkey(base64EncryptedString, pemPrivateKey
     .replace(pemHeader, "")
     .replace(pemFooter, "")
     .replace(/\s+/g, "");
+  console.log("PEM Contents length (after cleaning):", pemContents.length);
+
   let keyBuffer = Uint8Array.from(atob(pemContents), (c) =>
     c.charCodeAt(0)
   ).buffer;
+  console.log("keyBuffer ArrayBuffer length (bytes):", keyBuffer.byteLength);
 
-  // Import RSA private key
-  let cryptoKey = await crypto.subtle.importKey(
-    "pkcs8",
-    keyBuffer,
-    { name: "RSA-OAEP", hash: "SHA-256" },
-    true,
-    ["decrypt"]
-  );
+  try {
+    // Import RSA private key
+    let cryptoKey = await crypto.subtle.importKey(
+      "pkcs8",
+      keyBuffer,
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      true,
+      ["decrypt"]
+    );
+    console.log("RSA Private Key imported successfully.");
+    console.log("cryptoKey algorithm:", cryptoKey.algorithm.name, "modulusLength:", cryptoKey.algorithm.modulusLength);
 
-  // Get RSA key modulus length (in bytes) to determine the AES key size
-  let modulusLengthBytes = cryptoKey.algorithm.modulusLength / 8;
+    // Get RSA key modulus length (in bytes) to determine the AES key size
+    let modulusLengthBytes = cryptoKey.algorithm.modulusLength / 8;
+    console.log("RSA Modulus Length (bytes):", modulusLengthBytes);
 
-  // Decode base64 payload into a byte array
-  let payload = Uint8Array.from(atob(base64EncryptedString), (c) =>
-    c.charCodeAt(0)
-  );
+    // Decode base64 payload into a byte array
+    let payload = Uint8Array.from(atob(base64EncryptedString), (c) =>
+      c.charCodeAt(0)
+    );
+    console.log("Payload length (after base64 decode):", payload.length);
 
-  // Extract components from payload
-  if (payload.length < modulusLengthBytes + 12) {
-    throw new Error("Invalid payload: too short");
+    // Extract components from payload
+    if (payload.length < modulusLengthBytes + 12) {
+      console.error("Error: Invalid payload: too short. Expected at least", modulusLengthBytes + 12, "bytes, got", payload.length);
+      throw new Error("Invalid payload: too short");
+    }
+
+    let encryptedAesKey = payload.subarray(0, modulusLengthBytes);
+    let iv = payload.subarray(modulusLengthBytes, modulusLengthBytes + 12);
+    let ciphertext = payload.subarray(modulusLengthBytes + 12);
+
+    console.log("Encrypted AES Key length:", encryptedAesKey.length);
+    console.log("IV length:", iv.length);
+    console.log("Ciphertext length:", ciphertext.length);
+
+    // Decrypt AES key with RSA private key
+    console.log("Attempting to decrypt AES key with RSA-OAEP...");
+    let rawAesKey = await crypto.subtle.decrypt(
+      { name: "RSA-OAEP" },
+      cryptoKey,
+      encryptedAesKey
+    );
+    console.log("AES Key decrypted successfully. Raw AES Key length (bytes):", rawAesKey.byteLength);
+    // You might want to log a slice of the rawAesKey (e.g., first 4 bytes) for debugging
+    // console.log("Raw AES Key (first 4 bytes):", new Uint8Array(rawAesKey).slice(0,4));
+
+
+    // Import decrypted AES key
+    console.log("Attempting to import decrypted AES key as AES-GCM...");
+    let aesKey = await crypto.subtle.importKey(
+      "raw",
+      rawAesKey,
+      { name: "AES-GCM" },
+      true,
+      ["decrypt"]
+    );
+    console.log("AES Key imported successfully for AES-GCM.");
+
+    // Decrypt data with AES
+    console.log("Attempting to decrypt data with AES-GCM...");
+    let decryptedData = await crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: iv,
+      },
+      aesKey,
+      ciphertext
+    );
+    console.log("Data decrypted successfully. Decrypted Data length (bytes):", decryptedData.byteLength);
+
+    // --- ORIGINAL KEY CHANGE SECTION ---
+    // Convert the decrypted bytes (ArrayBuffer) back to a Base64 string
+    console.log("Attempting to convert decrypted data to binary string for btoa...");
+    let decryptedBinaryString = String.fromCharCode(
+      ...new Uint8Array(decryptedData)
+    );
+    console.log("Binary string length:", decryptedBinaryString.length);
+
+    console.log("Attempting to btoa (Base64 encode) the decrypted binary string...");
+    let finalResult = btoa(decryptedBinaryString);
+    console.log("Final Base64 result length:", finalResult.length);
+    console.log("--- decrypt_base64_using_privkey finished successfully ---");
+    return finalResult;
+    // ---
+  } catch (error) {
+    console.error("An operation error occurred during decryption:", error.name, error.message);
+    console.error("Error stack:", error.stack);
+    throw error; // Re-throw the error so the caller knows something went wrong
   }
-
-  let encryptedAesKey = payload.subarray(0, modulusLengthBytes);
-  let iv = payload.subarray(modulusLengthBytes, modulusLengthBytes + 12);
-  let ciphertext = payload.subarray(modulusLengthBytes + 12);
-
-  // Decrypt AES key with RSA private key
-  let rawAesKey = await crypto.subtle.decrypt(
-    { name: "RSA-OAEP" },
-    cryptoKey,
-    encryptedAesKey
-  );
-
-  // Import decrypted AES key
-  let aesKey = await crypto.subtle.importKey(
-    "raw",
-    rawAesKey,
-    { name: "AES-GCM" },
-    true,
-    ["decrypt"]
-  );
-
-  // Decrypt data with AES
-  let decryptedData = await crypto.subtle.decrypt(
-    {
-      name: "AES-GCM",
-      iv: iv,
-    },
-    aesKey,
-    ciphertext
-  );
-
-  // --- KEY CHANGE IS HERE ---
-  // Convert the decrypted ArrayBuffer to a UTF-8 string
-  const textDecoder = new TextDecoder("utf-8");
-  return textDecoder.decode(decryptedData);
-  // ---
 }
 
 async function sign_data_using_privkey(dataToSign, privateKey) {
