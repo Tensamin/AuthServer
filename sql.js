@@ -34,7 +34,6 @@ async function createUsersTable() {
     CREATE TABLE IF NOT EXISTS users (
       uuid VARCHAR(36) NOT NULL PRIMARY KEY UNIQUE,
       username VARCHAR(255) NOT NULL UNIQUE,
-      email VARCHAR(255) NOT NULL UNIQUE,
       public_key TEXT NOT NULL,
       private_key_hash VARCHAR(128) NOT NULL,
       token VARCHAR(255) NOT NULL UNIQUE,
@@ -70,13 +69,13 @@ async function createOmikronUUIDsTable() {
   };
 };
 
-async function addUser(uuid, username, email, public_key, private_key_hash, token, iota_uuid, created_at) {
+async function addUser(uuid, username, public_key, private_key_hash, token, iota_uuid, created_at) {
   try {
     let connection = await pool.getConnection();
     await connection.execute(`
-    INSERT INTO users (uuid, username, email, public_key, private_key_hash, token, iota_uuid, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-  `, [uuid, username, email, public_key, private_key_hash, token, iota_uuid, created_at]);
+    INSERT INTO users (uuid, username, public_key, private_key_hash, token, iota_uuid, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?);
+  `, [uuid, username, public_key, private_key_hash, token, iota_uuid, created_at]);
     connection.release();
 
     return { success: true, message: "Created User" };
@@ -122,24 +121,6 @@ async function changeUser_username(uuid, newValue) {
     };
 
     return { success: true, message: "Changed Username" }
-  } catch (err) {
-    return { success: false, message: err.message };
-  };
-};
-
-async function changeUser_email(uuid, newValue) {
-  try {
-    let connection = await pool.getConnection();
-    let [res] = await connection.execute(`
-      UPDATE users SET email = ? WHERE uuid = ?  
-    `, [newValue, uuid]);
-    connection.release();
-
-    if (res.length === 0) {
-      return { success: false, message: 'UUID not found.' };
-    };
-
-    return { success: true, message: "Changed Email" }
   } catch (err) {
     return { success: false, message: err.message };
   };
@@ -355,7 +336,6 @@ export {
   addUser,
   removeUser,
   changeUser_username,
-  changeUser_email,
   changeUser_iota_uuid,
   changeUser_public_key_and_private_key_hash,
   get_created_at,

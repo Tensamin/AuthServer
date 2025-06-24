@@ -42,7 +42,6 @@ app.post('/api/register/complete', async (req, res) => {
     try {
         if ("uuid" in req.body &&
             "username" in req.body &&
-            "email" in req.body &&
             "public_key" in req.body &&
             "private_key_hash" in req.body) {
 
@@ -57,7 +56,6 @@ app.post('/api/register/complete', async (req, res) => {
                 db.addUser(
                     req.body.uuid,
                     req.body.username,
-                    req.body.email,
                     req.body.public_key,
                     req.body.private_key_hash,
                     reset_token,
