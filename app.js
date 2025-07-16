@@ -106,41 +106,73 @@ app.post('/api/register/complete', async (req, res) => {
             type: "error",
             log: {
                 message: err.message,
-                log_level: 2,
+                log_level: 1,
             },
             data: {},
         })
     }
 });
 
-//app.post('/api/login', async (req, res) => {
-//    try {
-//        let data = req.body
-//
-//        if (data.uuid && data.private_key_hash) {
-//            let private_key_hash_db = await db.get_private_key_hash(data.uuid)
-//            let iota_uuid = await db.get_iota_uuid(data.uuid)
-//            if (private_key_hash_db.success) {
-//                if (private_key_hash_db.message === data.private_key_hash) {
-//                    // SUccess
-//                    res.json({
-//                        success: true, message: "Hash matches", data: {
-//                            iota_uuid: iota_uuid,
-//                        }
-//                    })
-//                } else {
-//                    res.json({ success: false, message: "Hash does not match" })
-//                }
-//            } else {
-//                res.status(500).json({ success: false, message: private_key_hash_db.message })
-//            }
-//        } else {
-//            res.json({ success: false, message: "Missing Value" })
-//        }
-//    } catch (err) {
-//        res.status(500).json({ success: false, message: err.message })
-//    }
-//});
+app.post('/api/login', async (req, res) => {
+    try {
+        let data = req.body
+
+        if (data.uuid && data.private_key_hash) {
+            let private_key_hash = await db.get_private_key_hash(data.uuid)
+            let iota_uuid = await db.get_iota_uuid(data.uuid)
+            if (private_key_hash.success) {
+                if (private_key_hash.message === data.private_key_hash) {
+                    res.json({
+                        type: "message",
+                        log: {
+                            message: "User login: Hash matches",
+                            log_level: 0
+                        },
+                        data: {
+                            iota_uuid: iota_uuid
+                        }
+                    })
+                } else {
+                    res.json({
+                        type: "error",
+                        log: {
+                            message: "Hash does not match",
+                            log_level: 1
+                        },
+                        data: {}
+                    })
+                }
+            } else {
+                res.status(500).json({
+                    type: "error",
+                    log: {
+                        message: private_key_hash.message,
+                        log_level: 1
+                    },
+                    data: {}
+                })
+            }
+        } else {
+            res.json({
+                type: "error",
+                log: {
+                    message: "Failed do to missing values",
+                    log_level: 1
+                },
+                data: {}
+            })
+        }
+    } catch (err) {
+        res.status(500).json({
+            type: "error",
+            log: {
+                message: err.message,
+                log_level: 1
+            },
+            data: {}
+        })
+    }
+});
 
 app.get('/api/:uuid/username', async (req, res) => {
     let uuid = req.params.uuid;
@@ -163,7 +195,7 @@ app.get('/api/:uuid/username', async (req, res) => {
                 type: "error",
                 log: {
                     message: `Failed to get username for ${uuid}: ${data.message}`,
-                    log_level: 2,
+                    log_level: 1,
                 },
                 data: {},
             })
@@ -173,7 +205,7 @@ app.get('/api/:uuid/username', async (req, res) => {
             type: "error",
             log: {
                 message: `Failed to get username for ${uuid}: ${err.message}`,
-                log_level: 2,
+                log_level: 1,
             },
             data: {},
         })
@@ -201,7 +233,7 @@ app.get('/api/:uuid/public-key', async (req, res) => {
                 type: "error",
                 log: {
                     message: `Failed to get public_key for ${uuid}: ${data.message}`,
-                    log_level: 2,
+                    log_level: 1,
                 },
                 data: {},
             })
@@ -211,7 +243,7 @@ app.get('/api/:uuid/public-key', async (req, res) => {
             type: "error",
             log: {
                 message: `Failed to get public_key for ${uuid}: ${err.message}`,
-                log_level: 2,
+                log_level: 1,
             },
             data: {},
         })
@@ -242,7 +274,7 @@ app.get('/api/:uuid/iota-uuid', async (req, res) => {
                         type: "error",
                         log: {
                             message: `Failed to get iota_uuid for ${uuid}: ${data.message}`,
-                            log_level: 2,
+                            log_level: 1,
                         },
                         data: {},
                     })
@@ -252,7 +284,7 @@ app.get('/api/:uuid/iota-uuid', async (req, res) => {
                     type: "error",
                     log: {
                         message: `Failed to get iota_uuid for ${uuid}: ${err.message}`,
-                        log_level: 2,
+                        log_level: 1,
                     },
                     data: {},
                 })
@@ -262,7 +294,7 @@ app.get('/api/:uuid/iota-uuid', async (req, res) => {
                 type: "error",
                 log: {
                     message: `Tried to access IOTA UUID for ${uuid}: Permission Denied`,
-                    log_level: 2,
+                    log_level: 1,
                 },
                 data: {},
             })
@@ -272,7 +304,7 @@ app.get('/api/:uuid/iota-uuid', async (req, res) => {
             type: "error",
             log: {
                 message: `Tried to access IOTA UUID for ${uuid}: Permission Denied`,
-                log_level: 2,
+                log_level: 1,
             },
             data: {},
         })
@@ -300,7 +332,7 @@ app.get('/api/:uuid/created-at', async (req, res) => {
                 type: "error",
                 log: {
                     message: `Failed to get created_at for ${uuid}: ${data.message}`,
-                    log_level: 2,
+                    log_level: 1,
                 },
                 data: {},
             })
@@ -310,7 +342,7 @@ app.get('/api/:uuid/created-at', async (req, res) => {
             type: "error",
             log: {
                 message: `Failed to get created_at for ${uuid}: ${err.message}`,
-                log_level: 2,
+                log_level: 1,
             },
             data: {},
         })
