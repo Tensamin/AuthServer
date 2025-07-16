@@ -36,9 +36,14 @@ async function createUsersTable() {
       username VARCHAR(255) NOT NULL UNIQUE,
       public_key TEXT NOT NULL,
       private_key_hash VARCHAR(128) NOT NULL,
-      token VARCHAR(255) NOT NULL UNIQUE,
       iota_uuid VARCHAR(255) NOT NULL UNIQUE,
-      created_at VARCHAR(255) NOT NULL
+      token VARCHAR(255) NOT NULL UNIQUE,
+      username VARCHAR(255) NOT NULL UNIQUE,
+      created_at VARCHAR(255) NOT NULL,
+      display VARCHAR(255) NOT NULL,
+      avatar TEXT NOT NULL,
+      about VARCHAR(200) NOT NULL,
+      status VARCHAR(35) NOT NULL,
     );
   `;
   try {
@@ -68,6 +73,10 @@ async function createOmikronUUIDsTable() {
     throw err;
   };
 };
+
+// Main Stuff
+
+// Main Stuff
 
 async function addUser(uuid, username, public_key, private_key_hash, token, iota_uuid, created_at) {
   try {
