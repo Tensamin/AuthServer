@@ -318,7 +318,7 @@ app.get('/api/:uuid/created-at', async (req, res) => {
 })
 
 app.get('/encryption-module', (req, res) => {
-    res.jsonFile(__dirname + '/encryption.js')
+    res.sendFile(__dirname + '/encryption.js')
 })
 
 // Start Server
