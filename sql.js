@@ -75,15 +75,13 @@ async function createOmikronUUIDsTable() {
 
 // Main Stuff
 
-// Main Stuff
-
-async function addUser(uuid, username, public_key, private_key_hash, token, iota_uuid, created_at) {
+async function addUser(uuid, public_key, private_key_hash, iota_uuid, token, username, created_at) {
   try {
     let connection = await pool.getConnection();
     await connection.execute(`
-    INSERT INTO users (uuid, username, public_key, private_key_hash, token, iota_uuid, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?);
-  `, [uuid, username, public_key, private_key_hash, token, iota_uuid, created_at]);
+    INSERT INTO users (uuid, public_key, private_key_hash, iota_uuid, token, username, created_at, display, avatar, about, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,?);
+  `, [uuid, public_key, private_key_hash, iota_uuid, token, username, created_at, "", "", "", ""]);
     connection.release();
 
     return { success: true, message: "Created User" };
