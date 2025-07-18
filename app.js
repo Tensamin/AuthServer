@@ -36,7 +36,7 @@ app.get('/api/register/init', async (req, res) => {
             log_level: 0,
         },
         data: {
-            uuid: newUser.uuid,
+            user_id: newUser.uuid,
         },
     });
 
@@ -119,7 +119,7 @@ app.post('/api/login', async (req, res) => {
 
         if (data.uuid && data.private_key_hash) {
             let private_key_hash = await db.get_private_key_hash(data.uuid)
-            let iota_uuid = await db.get_iota_uuid(data.uuid)
+            let iota_id = await db.get_iota_uuid(data.uuid)
             if (private_key_hash.success) {
                 if (private_key_hash.message === data.private_key_hash) {
                     res.json({
@@ -129,7 +129,7 @@ app.post('/api/login', async (req, res) => {
                             log_level: 0
                         },
                         data: {
-                            iota_uuid: iota_uuid
+                            iota_id: iota_id
                         }
                     })
                 } else {
