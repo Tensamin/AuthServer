@@ -32,8 +32,7 @@ async function init() {
 async function createUsersTable() {
   let createTableQuery = `
     CREATE TABLE IF NOT EXISTS users (
-      uuid VARCHAR(36) NOT NULL PRIMARY KEY UNIQUE,
-      username VARCHAR(255) NOT NULL UNIQUE,
+      uuid VARCHAR(36) NOT NULL PRIMARY KEY,
       public_key TEXT NOT NULL,
       private_key_hash VARCHAR(128) NOT NULL,
       iota_uuid VARCHAR(255) NOT NULL UNIQUE,
@@ -43,7 +42,7 @@ async function createUsersTable() {
       display VARCHAR(255) NOT NULL,
       avatar TEXT NOT NULL,
       about VARCHAR(200) NOT NULL,
-      status VARCHAR(35) NOT NULL,
+      status VARCHAR(35) NOT NULL
     );
   `;
   try {
