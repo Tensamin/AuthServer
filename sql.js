@@ -39,10 +39,10 @@ async function createUsersTable() {
       token VARCHAR(255) NOT NULL UNIQUE,
       username VARCHAR(255) NOT NULL UNIQUE,
       created_at VARCHAR(255) NOT NULL,
-      display VARCHAR(255) NOT NULL,
-      avatar TEXT NOT NULL,
-      about VARCHAR(200) NOT NULL,
-      status VARCHAR(35) NOT NULL
+      display VARCHAR(255),
+      avatar TEXT,
+      about VARCHAR(200),
+      status VARCHAR(35)
     );
   `;
   try {
