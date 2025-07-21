@@ -250,7 +250,7 @@ app.get('/api/:uuid/public-key', async (req, res) => {
     }
 })
 
-app.get('/api/:uuid/iota-uuid', async (req, res) => {
+app.get('/api/:uuid/iota-id', async (req, res) => {
     let uuid = req.params.uuid;
     if (req.headers.authorization) {
         let omikron_exists = await db.get_omikron_uuids(req.headers.authorization)
@@ -266,7 +266,7 @@ app.get('/api/:uuid/iota-uuid', async (req, res) => {
                             log_level: 0,
                         },
                         data: {
-                            iota_uuid: data.message,
+                            iota_id: data.message,
                         }
                     })
                 } else {
