@@ -11,8 +11,6 @@ import { fileURLToPath } from 'url';
 // Variables
 let __filename = fileURLToPath(import.meta.url);
 let __dirname = dirname(__filename);
-let publicKey = fs.readFileSync('public.pem', 'utf8');
-let privateKey = fs.readFileSync('private.pem', 'utf8');
 let port = process.env.PORT || 9187;
 let app = express();
 let userCreations = {};
