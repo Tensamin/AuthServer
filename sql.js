@@ -35,7 +35,7 @@ async function createUsersTable() {
       uuid VARCHAR(36) NOT NULL PRIMARY KEY,
       public_key TEXT NOT NULL,
       private_key_hash VARCHAR(128) NOT NULL,
-      iota_uuid VARCHAR(255) NOT NULL UNIQUE,
+      iota_id VARCHAR(255) NOT NULL UNIQUE,
       token VARCHAR(255) NOT NULL UNIQUE,
       username VARCHAR(255) NOT NULL UNIQUE,
       created_at VARCHAR(255) NOT NULL,
@@ -75,13 +75,13 @@ async function createOmikronUUIDsTable() {
 
 // Main Stuff
 
-async function addUser(uuid, public_key, private_key_hash, username, token, iota_uuid, created_at) {
+async function addUser(uuid, public_key, private_key_hash, username, token, iota_id, created_at) {
   try {
     let connection = await pool.getConnection();
     await connection.execute(`
-    INSERT INTO users (uuid, public_key, private_key_hash, username, token, iota_uuid, created_at, display, avatar, about, status)
+    INSERT INTO users (uuid, public_key, private_key_hash, username, token, iota_id, created_at, display, avatar, about, status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,?);
-  `, [uuid, public_key, private_key_hash, username, token, iota_uuid, created_at, "", "", "", ""]);
+  `, [uuid, public_key, private_key_hash, username, token, iota_id, created_at, "", "", "", ""]);
     connection.release();
 
     return { success: true, message: "Created User" };
@@ -132,7 +132,7 @@ async function changeUser_username(uuid, newValue) {
   };
 };
 
-async function changeUser_iota_uuid(uuid, token, newValue) {
+async function changeUser_iota_id(uuid, token, newValue) {
   try {
     let connection = await pool.getConnection();
     let [rows] = await connection.execute(
@@ -159,7 +159,7 @@ async function changeUser_iota_uuid(uuid, token, newValue) {
     `, [newToken, uuid]);
 
     await connection.execute(`
-      UPDATE users SET iota_uuid = ? WHERE uuid = ?  
+      UPDATE users SET iota_id = ? WHERE uuid = ?  
     `, [newValue, uuid]);
 
     return { success: true, message: newToken };
@@ -327,17 +327,17 @@ async function get_private_key_hash(uuid) {
   };
 };
 
-async function get_iota_uuid(uuid) {
+async function get_iota_id(uuid) {
   try {
     let connection = await pool.getConnection();
-    let [rows] = await connection.execute(`SELECT iota_uuid FROM users WHERE uuid = ?;`, [uuid]);
+    let [rows] = await connection.execute(`SELECT iota_id FROM users WHERE uuid = ?;`, [uuid]);
     connection.release();
 
     if (rows.length === 0) {
       return { success: false, message: 'UUID not found.' };
     };
 
-    return { success: true, message: rows[0].iota_uuid };
+    return { success: true, message: rows[0].iota_id };
 
   } catch (err) {
     return { success: false, message: err.message };
@@ -376,12 +376,12 @@ export {
   addUser,
   removeUser,
   changeUser_username,
-  changeUser_iota_uuid,
+  changeUser_iota_id,
   changeUser_public_key_and_private_key_hash,
   get_created_at,
   get_public_key,
   get_private_key_hash,
-  get_iota_uuid,
+  get_iota_id,
   get_omikron_uuids,
   get_username,
   get_display,

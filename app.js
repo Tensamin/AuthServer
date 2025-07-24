@@ -51,14 +51,13 @@ app.post('/api/register/complete', async (req, res) => {
             "username" in req.body &&
             "public_key" in req.body &&
             "private_key_hash" in req.body &&
-            "username" in req.body) {
+            "username" in req.body &&
+            "iota_id" in req.body) {
 
             let tokenPart1 = v7();
             let tokenPart2 = v7();
             let tokenPart3 = v7();
             let reset_token = `${tokenPart1}.${tokenPart2}.${tokenPart3}`;
-
-            let iota_uuid = v7();
 
             let newUsername = req.body.username.toLowerCase().replace(/[^a-z0-9_]/g, '');
 
@@ -69,7 +68,7 @@ app.post('/api/register/complete', async (req, res) => {
                     req.body.private_key_hash,
                     newUsername,
                     reset_token,
-                    iota_uuid,
+                    req.body.iota_id,
                     new Date().getTime(),
                 );
                 delete userCreations[req.body.uuid];
@@ -119,7 +118,7 @@ app.post('/api/login', async (req, res) => {
 
         if (data.uuid && data.private_key_hash) {
             let private_key_hash = await db.get_private_key_hash(data.uuid)
-            let iota_id = await db.get_iota_uuid(data.uuid)
+            let iota_id = await db.get_iota_id(data.uuid)
             if (private_key_hash.success) {
                 if (private_key_hash.message === data.private_key_hash) {
                     res.json({
@@ -333,12 +332,12 @@ app.get('/api/:uuid/iota-id', async (req, res) => {
 
         if (omikron_exists.success) {
             try {
-                let data = await db.get_iota_uuid(uuid)
+                let data = await db.get_iota_id(uuid)
                 if (data.success) {
                     res.json({
                         type: "message",
                         log: {
-                            message: `Get iota_uuid for ${uuid}: ${data.message}`,
+                            message: `Get iota_id for ${uuid}: ${data.message}`,
                             log_level: 0,
                         },
                         data: {
@@ -349,7 +348,7 @@ app.get('/api/:uuid/iota-id', async (req, res) => {
                     res.status(500).json({
                         type: "error",
                         log: {
-                            message: `Failed to get iota_uuid for ${uuid}: ${data.message}`,
+                            message: `Failed to get iota_id for ${uuid}: ${data.message}`,
                             log_level: 1,
                         },
                         data: {},
@@ -359,7 +358,7 @@ app.get('/api/:uuid/iota-id', async (req, res) => {
                 res.status(500).json({
                     type: "error",
                     log: {
-                        message: `Failed to get iota_uuid for ${uuid}: ${err.message}`,
+                        message: `Failed to get iota_id for ${uuid}: ${err.message}`,
                         log_level: 1,
                     },
                     data: {},
