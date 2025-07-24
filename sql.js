@@ -259,6 +259,40 @@ async function get_display(uuid) {
   };
 };
 
+async function get_about(uuid) {
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(`SELECT about FROM users WHERE uuid = ?;`, [uuid]);
+    connection.release();
+
+    if (rows.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: rows[0].about };
+
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
+async function get_status(uuid) {
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(`SELECT status FROM users WHERE uuid = ?;`, [uuid]);
+    connection.release();
+
+    if (rows.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: rows[0].status };
+
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
 async function get_avatar(uuid) {
   try {
     let connection = await pool.getConnection();
@@ -386,5 +420,7 @@ export {
   get_username,
   get_display,
   get_avatar,
+  get_about,
+  get_status,
   usernameToUUID,
 };

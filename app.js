@@ -173,6 +173,46 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+app.get('/api/:uuid', async (req, res) => {
+    let uuid = req.params.uuid;
+
+    try {
+        let createdAtData = await db.get_created_at(uuid);
+        let usernameData  = await db.get_username(uuid);
+        let displayData   = await db.get_display(uuid);
+        let avatarData    = await db.get_avatar(uuid);
+        let aboutData     = await db.get_about(uuid);
+        let statusData    = await db.get_status(uuid);
+
+        if (createdAtData.success && usernameData.success && displayData.success && avatarData.success && aboutData.success && statusData.success) {
+            res.json({
+                type: "message",
+                log: {
+                    message: `Get user for ${uuid}: ${data.message}`,
+                    log_level: 0,
+                },
+                data: {
+                    created_at: createdAtData.message,
+                    username: usernameData.message,
+                    display: displayData.message,
+                    avatar: avatarData.message,
+                    about: aboutData.message,
+                    status: statusData.message,
+                },
+            })
+        }
+    } catch (err) {
+        res.status(500).json({
+            type: "error",
+            log: {
+                message: `Failed to get user for ${uuid}: ${err.message}`,
+                log_level: 1,
+            },
+            data: {},
+        })
+    }
+})
+
 app.get('/api/:uuid/username', async (req, res) => {
     let uuid = req.params.uuid;
 
