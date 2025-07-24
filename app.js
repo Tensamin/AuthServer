@@ -60,12 +60,14 @@ app.post('/api/register/complete', async (req, res) => {
 
             let iota_uuid = v7();
 
+            let newUsername = req.body.username.toLowerCase().replace(/[^a-z0-9.]/g, '');
+
             if (userCreations[req.body.uuid]) {
                 db.addUser(
                     req.body.uuid,
                     req.body.public_key,
                     req.body.private_key_hash,
-                    req.body.username,
+                    newUsername,
                     reset_token,
                     iota_uuid,
                     new Date().getTime(),
