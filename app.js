@@ -176,7 +176,7 @@ app.get('/api/:uuid/username', async (req, res) => {
     let uuid = req.params.uuid;
 
     try {
-        let data = await db.UUIDtoUsername(uuid);
+        let data = await db.get_username(uuid);
         if (data.success) {
             res.json({
                 type: "message",
@@ -203,6 +203,82 @@ app.get('/api/:uuid/username', async (req, res) => {
             type: "error",
             log: {
                 message: `Failed to get username for ${uuid}: ${err.message}`,
+                log_level: 1,
+            },
+            data: {},
+        })
+    }
+})
+
+app.get('/api/:uuid/display', async (req, res) => {
+    let uuid = req.params.uuid;
+
+    try {
+        let data = await db.get_display(uuid);
+        if (data.success) {
+            res.json({
+                type: "message",
+                log: {
+                    message: `Get display for ${uuid}: ${data.message}`,
+                    log_level: 0,
+                },
+                data: {
+                    display: data.message,
+                }
+            })
+        } else {
+            res.status(500).json({
+                type: "error",
+                log: {
+                    message: `Failed to get display for ${uuid}: ${data.message}`,
+                    log_level: 1,
+                },
+                data: {},
+            })
+        }
+    } catch (err) {
+        res.status(500).json({
+            type: "error",
+            log: {
+                message: `Failed to get display for ${uuid}: ${err.message}`,
+                log_level: 1,
+            },
+            data: {},
+        })
+    }
+})
+
+app.get('/api/:uuid/avatar', async (req, res) => {
+    let uuid = req.params.uuid;
+
+    try {
+        let data = await db.get_avatar(uuid);
+        if (data.success) {
+            res.json({
+                type: "message",
+                log: {
+                    message: `Get avatar for ${uuid}: ${data.message}`,
+                    log_level: 0,
+                },
+                data: {
+                    avatar: data.message,
+                }
+            })
+        } else {
+            res.status(500).json({
+                type: "error",
+                log: {
+                    message: `Failed to get avatar for ${uuid}: ${data.message}`,
+                    log_level: 1,
+                },
+                data: {},
+            })
+        }
+    } catch (err) {
+        res.status(500).json({
+            type: "error",
+            log: {
+                message: `Failed to get avatar for ${uuid}: ${err.message}`,
                 log_level: 1,
             },
             data: {},

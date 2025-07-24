@@ -208,7 +208,24 @@ async function changeUser_public_key_and_private_key_hash(uuid, token, newPublic
   };
 };
 
-async function UUIDtoUsername(uuid) {
+async function usernameToUUID(username) {
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(`SELECT uuid FROM users WHERE username = ?;`, [username]);
+    connection.release();
+
+    if (rows.length === 0) {
+      return { success: false, message: 'Username not found.' };
+    };
+
+    return { success: true, message: rows[0].uuid };
+
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
+async function get_username(uuid) {
   try {
     let connection = await pool.getConnection();
     let [rows] = await connection.execute(`SELECT username FROM users WHERE uuid = ?;`, [uuid]);
@@ -225,17 +242,34 @@ async function UUIDtoUsername(uuid) {
   };
 };
 
-async function usernameToUUID(username) {
+async function get_display(uuid) {
   try {
     let connection = await pool.getConnection();
-    let [rows] = await connection.execute(`SELECT uuid FROM users WHERE username = ?;`, [username]);
+    let [rows] = await connection.execute(`SELECT display FROM users WHERE uuid = ?;`, [uuid]);
     connection.release();
 
     if (rows.length === 0) {
-      return { success: false, message: 'Username not found.' };
+      return { success: false, message: 'UUID not found.' };
     };
 
-    return { success: true, message: rows[0].uuid };
+    return { success: true, message: rows[0].display };
+
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
+async function get_avatar(uuid) {
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(`SELECT avatar FROM users WHERE uuid = ?;`, [uuid]);
+    connection.release();
+
+    if (rows.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: rows[0].avatar };
 
   } catch (err) {
     return { success: false, message: err.message };
@@ -349,6 +383,8 @@ export {
   get_private_key_hash,
   get_iota_uuid,
   get_omikron_uuids,
-  UUIDtoUsername,
+  get_username,
+  get_display,
+  get_avatar,
   usernameToUUID,
 };
