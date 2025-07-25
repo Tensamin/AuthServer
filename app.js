@@ -4,7 +4,6 @@ import fs from 'fs';
 import { v7 } from 'uuid';
 import "dotenv/config";
 import * as db from './sql.js';
-import cors from "cors";
 import { dirname } from "path";
 import { fileURLToPath } from 'url';
 
@@ -16,7 +15,6 @@ let app = express();
 let userCreations = {};
 
 // Environment
-app.use(cors());
 app.use(express.json());
 
 // API Endpoints
