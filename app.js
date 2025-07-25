@@ -188,7 +188,7 @@ app.get('/api/:uuid', async (req, res) => {
             res.json({
                 type: "message",
                 log: {
-                    message: `Get user for ${uuid}: ${data.message}`,
+                    message: `Get user for ${uuid}`,
                     log_level: 0,
                 },
                 data: {
