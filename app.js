@@ -183,7 +183,7 @@ app.get('/api/:uuid', async (req, res) => {
         let avatarData    = await db.get_avatar(uuid);
         let aboutData     = await db.get_about(uuid);
         let statusData    = await db.get_status(uuid);
-        let publicKeyData    = await db.get_public_key(uuid);
+        let publicKeyData = await db.get_public_key(uuid);
 
         if (createdAtData.success && usernameData.success && displayData.success && avatarData.success && aboutData.success && statusData.success && publicKeyData.success) {
             res.json({
