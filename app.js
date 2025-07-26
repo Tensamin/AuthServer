@@ -466,7 +466,7 @@ app.get('/api/:uuid/created-at', async (req, res) => {
     }
 })
 
-app.post('/api/:uuid/username', async (req, res) => {
+app.post('/api/:uuid/change_username', async (req, res) => {
     let uuid = req.params.uuid;
     try {
         if ("private_key_hash" in req.body && "username" in req.body) {
