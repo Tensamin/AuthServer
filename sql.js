@@ -114,7 +114,7 @@ async function removeUser(uuid, token) {
   };
 };
 
-async function changeUser_username(uuid, newValue) {
+async function change_username(uuid, newValue) {
   try {
     let connection = await pool.getConnection();
     let [res] = await connection.execute(`
@@ -126,7 +126,79 @@ async function changeUser_username(uuid, newValue) {
       return { success: false, message: 'UUID not found.' };
     };
 
-    return { success: true, message: "Changed Username" }
+    return { success: true, message: "Changed username" }
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
+async function change_display(uuid, newValue) {
+  try {
+    let connection = await pool.getConnection();
+    let [res] = await connection.execute(`
+      UPDATE users SET display = ? WHERE uuid = ?  
+    `, [newValue, uuid]);
+    connection.release();
+
+    if (res.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: "Changed display" }
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
+async function change_avatar(uuid, newValue) {
+  try {
+    let connection = await pool.getConnection();
+    let [res] = await connection.execute(`
+      UPDATE users SET avatar = ? WHERE uuid = ?  
+    `, [newValue, uuid]);
+    connection.release();
+
+    if (res.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: "Changed avatar" }
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
+async function change_about(uuid, newValue) {
+  try {
+    let connection = await pool.getConnection();
+    let [res] = await connection.execute(`
+      UPDATE users SET about = ? WHERE uuid = ?  
+    `, [newValue, uuid]);
+    connection.release();
+
+    if (res.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: "Changed about" }
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
+async function change_status(uuid, newValue) {
+  try {
+    let connection = await pool.getConnection();
+    let [res] = await connection.execute(`
+      UPDATE users SET status = ? WHERE uuid = ?  
+    `, [newValue, uuid]);
+    connection.release();
+
+    if (res.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: "Changed status" }
   } catch (err) {
     return { success: false, message: err.message };
   };
@@ -409,9 +481,13 @@ export {
   close,
   addUser,
   removeUser,
-  changeUser_username,
   changeUser_iota_id,
   changeUser_public_key_and_private_key_hash,
+  change_username,
+  change_display,
+  change_avatar,
+  change_about,
+  change_status,
   get_created_at,
   get_public_key,
   get_private_key_hash,
