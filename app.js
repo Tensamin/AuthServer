@@ -6,6 +6,7 @@ import "dotenv/config";
 import * as db from './sql.js';
 import { dirname } from "path";
 import { fileURLToPath } from 'url';
+import cors from "cors";
 
 // Variables
 let __filename = fileURLToPath(import.meta.url);
@@ -15,6 +16,7 @@ let app = express();
 let userCreations = {};
 
 // Environment
+app.use(cors())
 app.use(express.json());
 
 // API Endpoints
