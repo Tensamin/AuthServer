@@ -470,21 +470,44 @@ app.post('/api/:uuid/username', async (req, res) => {
     let uuid = req.params.uuid;
     try {
         if ("private_key_hash" in req.body && "username" in req.body) {
-            let data = await db.change_username(uuid, req.body.username)
-            if (data.success) {
-                res.json({
-                    type: "message",
-                    log: {
-                        message: `Changed username for ${uuid} to ${req.body.username}`,
-                        log_level: 0
-                    },
-                    data: {}
-                })
+            let private_key_hash = await db.get_private_key_hash(uuid)
+            if (private_key_hash.success) {
+                if (req.body.private_key_hash === private_key_hash) {
+                    let data = await db.change_username(uuid, req.body.username)
+                    if (data.success) {
+                        res.json({
+                            type: "message",
+                            log: {
+                                message: `Changed username for ${uuid} to ${req.body.username}`,
+                                log_level: 0
+                            },
+                            data: {}
+                        })
+                    } else {
+                        res.status(500).json({
+                            type: "error",
+                            log: {
+                                message: `Failed to change username ${uuid}: ${data.message}`,
+                                log_level: 1
+                            },
+                            data: {}
+                        })
+                    }
+                } else {
+                    res.status(403).json({
+                        type: "error",
+                        log: {
+                            message: `Failed to change username ${uuid}: Permission Denied`,
+                            log_level: 1
+                        },
+                        data: {}
+                    })
+                }
             } else {
                 res.status(500).json({
                     type: "error",
                     log: {
-                        message: `Failed to change username ${uuid}: ${data.message}`,
+                        message: `Failed to change username ${uuid}: ${private_key_hash.message}`,
                         log_level: 1
                     },
                     data: {}
@@ -505,190 +528,6 @@ app.post('/api/:uuid/username', async (req, res) => {
             type: "error",
             log: {
                 message: `Failed to change username ${uuid}: ${err.message}`,
-                log_level: 1
-            },
-            data: {}
-        })
-    }
-})
-
-app.post('/api/:uuid/display', async (req, res) => {
-    let uuid = req.params.uuid;
-    try {
-        if ("private_key_hash" in req.body && "display" in req.body) {
-            let data = await db.change_display(uuid, req.body.display)
-            if (data.success) {
-                res.json({
-                    type: "message",
-                    log: {
-                        message: `Changed display for ${uuid} to ${req.body.display}`,
-                        log_level: 0
-                    },
-                    data: {}
-                })
-            } else {
-                res.status(500).json({
-                    type: "error",
-                    log: {
-                        message: `Failed to change display ${uuid}: ${data.message}`,
-                        log_level: 1
-                    },
-                    data: {}
-                })
-            }
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to change display ${uuid}: Missing Value`,
-                    log_level: 1
-                },
-                data: {}
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to change display ${uuid}: ${err.message}`,
-                log_level: 1
-            },
-            data: {}
-        })
-    }
-})
-
-app.post('/api/:uuid/avatar', async (req, res) => {
-    let uuid = req.params.uuid;
-    try {
-        if ("private_key_hash" in req.body && "avatar" in req.body) {
-            let data = await db.change_avatar(uuid, req.body.avatar)
-            if (data.success) {
-                res.json({
-                    type: "message",
-                    log: {
-                        message: `Changed avatar for ${uuid} to ${req.body.avatar}`,
-                        log_level: 0
-                    },
-                    data: {}
-                })
-            } else {
-                res.status(500).json({
-                    type: "error",
-                    log: {
-                        message: `Failed to change avatar ${uuid}: ${data.message}`,
-                        log_level: 1
-                    },
-                    data: {}
-                })
-            }
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to change avatar ${uuid}: Missing Value`,
-                    log_level: 1
-                },
-                data: {}
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to change avatar ${uuid}: ${err.message}`,
-                log_level: 1
-            },
-            data: {}
-        })
-    }
-})
-
-app.post('/api/:uuid/about', async (req, res) => {
-    let uuid = req.params.uuid;
-    try {
-        if ("private_key_hash" in req.body && "about" in req.body) {
-            let data = await db.change_about(uuid, req.body.about)
-            if (data.success) {
-                res.json({
-                    type: "message",
-                    log: {
-                        message: `Changed about for ${uuid} to ${req.body.about}`,
-                        log_level: 0
-                    },
-                    data: {}
-                })
-            } else {
-                res.status(500).json({
-                    type: "error",
-                    log: {
-                        message: `Failed to change about ${uuid}: ${data.message}`,
-                        log_level: 1
-                    },
-                    data: {}
-                })
-            }
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to change about ${uuid}: Missing Value`,
-                    log_level: 1
-                },
-                data: {}
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to change about ${uuid}: ${err.message}`,
-                log_level: 1
-            },
-            data: {}
-        })
-    }
-})
-
-app.post('/api/:uuid/status', async (req, res) => {
-    let uuid = req.params.uuid;
-    try {
-        if ("private_key_hash" in req.body && "status" in req.body) {
-            let data = await db.change_status(uuid, req.body.status)
-            if (data.success) {
-                res.json({
-                    type: "message",
-                    log: {
-                        message: `Changed status for ${uuid} to ${req.body.status}`,
-                        log_level: 0
-                    },
-                    data: {}
-                })
-            } else {
-                res.status(500).json({
-                    type: "error",
-                    log: {
-                        message: `Failed to change status ${uuid}: ${data.message}`,
-                        log_level: 1
-                    },
-                    data: {}
-                })
-            }
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to change status ${uuid}: Missing Value`,
-                    log_level: 1
-                },
-                data: {}
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to change status ${uuid}: ${err.message}`,
                 log_level: 1
             },
             data: {}
