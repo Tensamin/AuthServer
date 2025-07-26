@@ -472,7 +472,7 @@ app.post('/api/:uuid/change_username', async (req, res) => {
         if ("private_key_hash" in req.body && "username" in req.body) {
             let private_key_hash = await db.get_private_key_hash(uuid)
             if (private_key_hash.success) {
-                if (req.body.private_key_hash === private_key_hash) {
+                if (req.body.private_key_hash === private_key_hash.message) {
                     let data = await db.change_username(uuid, req.body.username)
                     if (data.success) {
                         res.json({
