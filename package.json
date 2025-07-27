@@ -1,6 +1,6 @@
 {
   "name": "tensamin-authserver",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Authentication server code for the Tensamin Project",
   "license": "CC0-TENSAMIN",
   "author": "Methanium",
