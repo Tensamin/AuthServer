@@ -42,7 +42,7 @@ async function createUsersTable() {
       display VARCHAR(255),
       avatar TEXT,
       about VARCHAR(200),
-      status VARCHAR(35)
+      status VARCHAR(15)
     );
   `;
   try {
