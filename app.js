@@ -1,22 +1,17 @@
 // Imports
 import express from 'express';
-import fs from 'fs';
-import { v7 } from 'uuid';
-import "dotenv/config";
-import * as db from './sql.js';
-import { dirname } from "path";
-import { fileURLToPath } from 'url';
 import cors from "cors";
+import { v7 } from 'uuid';
+import * as db from './sql.js';
+import "dotenv/config";
 
 // Variables
-let __filename = fileURLToPath(import.meta.url);
-let __dirname = dirname(__filename);
 let port = process.env.PORT || 9187;
 let app = express();
 let userCreations = {};
 
 // Environment
-app.use(cors())
+app.use(cors());
 app.use(express.json());
 
 // API Endpoints
@@ -213,7 +208,7 @@ app.get('/api/:uuid', async (req, res) => {
             data: {},
         })
     }
-})
+});
 
 app.get('/api/:uuid/username', async (req, res) => {
     let uuid = req.params.uuid;
@@ -251,7 +246,7 @@ app.get('/api/:uuid/username', async (req, res) => {
             data: {},
         })
     }
-})
+});
 
 app.get('/api/:uuid/display', async (req, res) => {
     let uuid = req.params.uuid;
@@ -289,7 +284,7 @@ app.get('/api/:uuid/display', async (req, res) => {
             data: {},
         })
     }
-})
+});
 
 app.get('/api/:uuid/avatar', async (req, res) => {
     let uuid = req.params.uuid;
@@ -327,7 +322,7 @@ app.get('/api/:uuid/avatar', async (req, res) => {
             data: {},
         })
     }
-})
+});
 
 app.get('/api/:uuid/public-key', async (req, res) => {
     let uuid = req.params.uuid;
@@ -365,7 +360,7 @@ app.get('/api/:uuid/public-key', async (req, res) => {
             data: {},
         })
     }
-})
+});
 
 app.get('/api/:uuid/iota-id', async (req, res) => {
     let uuid = req.params.uuid;
@@ -426,7 +421,7 @@ app.get('/api/:uuid/iota-id', async (req, res) => {
             data: {},
         })
     }
-})
+});
 
 app.get('/api/:uuid/created-at', async (req, res) => {
     let uuid = req.params.uuid;
@@ -464,7 +459,7 @@ app.get('/api/:uuid/created-at', async (req, res) => {
             data: {},
         })
     }
-})
+});
 
 app.post('/api/:uuid/change_username', async (req, res) => {
     let uuid = req.params.uuid;
@@ -533,7 +528,7 @@ app.post('/api/:uuid/change_username', async (req, res) => {
             data: {}
         })
     }
-})
+});
 
 app.post('/api/:uuid/change_display', async (req, res) => {
     let uuid = req.params.uuid;
@@ -602,7 +597,7 @@ app.post('/api/:uuid/change_display', async (req, res) => {
             data: {}
         })
     }
-})
+});
 
 app.post('/api/:uuid/change_avatar', async (req, res) => {
     let uuid = req.params.uuid;
@@ -671,7 +666,7 @@ app.post('/api/:uuid/change_avatar', async (req, res) => {
             data: {}
         })
     }
-})
+});
 
 app.post('/api/:uuid/change_about', async (req, res) => {
     let uuid = req.params.uuid;
@@ -740,7 +735,7 @@ app.post('/api/:uuid/change_about', async (req, res) => {
             data: {}
         })
     }
-})
+});
 
 app.post('/api/:uuid/change_status', async (req, res) => {
     let uuid = req.params.uuid;
@@ -809,14 +804,13 @@ app.post('/api/:uuid/change_status', async (req, res) => {
             data: {}
         })
     }
-})
+});
 
 // Start Server
 app.listen(port, async () => {
     await db.init();
     console.log(`> Started at http://0.0.0.0:${port} / https://auth-tensamin.methanium.net`);
 });
-
 
 // Database Disconnect Cleanup
 process.on('SIGINT', db.close);

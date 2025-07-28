@@ -141,7 +141,7 @@ async function change_username(uuid, newValue) {
     let connection = await pool.getConnection();
     let [res] = await connection.execute(`
       UPDATE users SET username = ? WHERE uuid = ?  
-    `, [newValue, uuid]);
+    `, [newValue.toLowerCase(), uuid]);
     connection.release();
 
     if (res.length === 0) {
@@ -560,7 +560,7 @@ WHERE sub_end = 0;`, []);
   }
 }
 
-let job = schedule.scheduleJob('0 0 * * *', { tz: 'UTC' }, () => {
+let job = schedule.scheduleJob('00 00 * * *', { tz: 'UTC' }, () => {
   removeOneDayFromEverySubscription();
 });
 
