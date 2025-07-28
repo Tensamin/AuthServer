@@ -1,7 +1,27 @@
 import mysql from 'mysql2/promise';
 import 'dotenv/config';
+import * as schedule from "node-schedule"
 
 let pool;
+
+async function scaleAndCompressImage(base64Image, quality = 0.9) {
+  let width = 100;
+  let height = 100;
+  const img = new Image();
+  img.src = base64Image;
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
+  const compressedBase64 = canvas.toDataURL("image/webp", quality);
+  return compressedBase64;
+}
 
 async function init() {
   if (pool) {
@@ -40,9 +60,11 @@ async function createUsersTable() {
       username VARCHAR(255) NOT NULL UNIQUE,
       created_at VARCHAR(255) NOT NULL,
       display VARCHAR(255),
-      avatar TEXT,
+      avatar MEDIUMTEXT,
       about VARCHAR(200),
-      status VARCHAR(15)
+      status VARCHAR(15),
+      sub_level INT NOT NULL,
+      sub_end BIGINT NOT NULL
     );
   `;
   try {
@@ -79,9 +101,9 @@ async function addUser(uuid, public_key, private_key_hash, username, token, iota
   try {
     let connection = await pool.getConnection();
     await connection.execute(`
-    INSERT INTO users (uuid, public_key, private_key_hash, username, token, iota_id, created_at, display, avatar, about, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,?);
-  `, [uuid, public_key, private_key_hash, username, token, iota_id, created_at, "", "", "", ""]);
+    INSERT INTO users (uuid, public_key, private_key_hash, username, token, iota_id, created_at, display, avatar, about, status, sub_level, sub_end)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,?, ?, ?);
+  `, [uuid, public_key, private_key_hash, username, token, iota_id, created_at, "", "", "", "", 0, 0]);
     connection.release();
 
     return { success: true, message: "Created User" };
@@ -152,17 +174,29 @@ async function change_display(uuid, newValue) {
 
 async function change_avatar(uuid, newValue) {
   try {
-    let connection = await pool.getConnection();
-    let [res] = await connection.execute(`
+    let sub_level = await get_sub_level(uuid)
+    if (sub_level.success) {
+      let newImage;
+      if (sub_level.message === "0") {
+        newImage = await scaleAndCompressImage(newValue)
+      } else {
+        newImage = newValue
+      }
+
+      let connection = await pool.getConnection();
+      let [res] = await connection.execute(`
       UPDATE users SET avatar = ? WHERE uuid = ?  
-    `, [newValue, uuid]);
-    connection.release();
+    `, [newImage, uuid]);
+      connection.release();
 
-    if (res.length === 0) {
-      return { success: false, message: 'UUID not found.' };
-    };
+      if (res.length === 0) {
+        return { success: false, message: 'UUID not found.' };
+      };
 
-    return { success: true, message: "Changed avatar" }
+      return { success: true, message: "Changed avatar" } 
+  } else {
+    return { success: false, message: sub_level.message}
+  }
   } catch (err) {
     return { success: false, message: err.message };
   };
@@ -450,6 +484,40 @@ async function get_iota_id(uuid) {
   };
 };
 
+async function get_sub_level(uuid) {
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(`SELECT sub_level FROM users WHERE uuid = ?;`, [uuid]);
+    connection.release();
+
+    if (rows.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: rows[0].sub_level };
+
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
+async function get_sub_end(uuid) {
+  try {
+    let connection = await pool.getConnection();
+    let [rows] = await connection.execute(`SELECT sub_end FROM users WHERE uuid = ?;`, [uuid]);
+    connection.release();
+
+    if (rows.length === 0) {
+      return { success: false, message: 'UUID not found.' };
+    };
+
+    return { success: true, message: rows[0].sub_end };
+
+  } catch (err) {
+    return { success: false, message: err.message };
+  };
+};
+
 async function get_omikron_uuids(uuid) {
   try {
     let connection = await pool.getConnection();
@@ -476,6 +544,33 @@ async function close() {
   };
 };
 
+async function removeOneDayFromEverySubscription() {
+  let now = new Date();
+  console.log(`Removed 1 day from all subscriptions at ${now.toISOString()} (local time: ${now.toLocaleString()}).`)
+  try {
+    let connection = await pool.getConnection();
+    await connection.execute(`UPDATE users
+SET sub_end = GREATEST(0, sub_end - 1);`, []);
+    await connection.execute(`UPDATE users
+SET sub_level = 0
+WHERE sub_end = 0;`, []);
+    connection.release();
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+let job = schedule.scheduleJob('0 0 * * *', { tz: 'UTC' }, () => {
+  removeOneDayFromEverySubscription();
+});
+
+console.log('Node.js scheduler started.');
+console.log('Job scheduled to run every day at 00:00 UTC.');
+console.log(
+  'Next scheduled invocation:',
+  job.nextInvocation().toISOString()
+);
+
 export {
   init,
   close,
@@ -498,5 +593,7 @@ export {
   get_avatar,
   get_about,
   get_status,
+  get_sub_level,
+  get_sub_end,
   usernameToUUID,
 };
