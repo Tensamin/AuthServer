@@ -1,6 +1,7 @@
 import mysql from 'mysql2/promise';
 import 'dotenv/config';
 import * as schedule from "node-schedule"
+import sharp from "sharp"
 
 let pool;
 
