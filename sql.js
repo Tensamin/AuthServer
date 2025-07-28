@@ -565,7 +565,7 @@ WHERE sub_end = 0;`, []);
   }
 }
 
-let job = schedule.scheduleJob('0 0 * * *', { tz: 'UTC' }, () => {
+let job = schedule.scheduleJob({ hour: 0, minute: 0 }, function() {
   removeOneDayFromEverySubscription();
 });
 
