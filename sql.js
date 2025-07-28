@@ -181,7 +181,7 @@ async function change_avatar(uuid, newValue) {
     let sub_level = await get_sub_level(uuid)
     if (sub_level.success) {
       let newImage;
-      if (sub_level.message === "0") {
+      if (sub_level.message === 0) {
         newImage = await adjustAvatar(newValue, false, 60)
       } else {
         newImage = await adjustAvatar(newValue, true, 0)
