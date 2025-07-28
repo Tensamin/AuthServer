@@ -4,23 +4,51 @@ import * as schedule from "node-schedule"
 
 let pool;
 
-async function scaleAndCompressImage(base64Image, quality = 0.9) {
-  let width = 100;
-  let height = 100;
-  const img = new Image();
-  img.src = base64Image;
-  await new Promise((resolve, reject) => {
-    img.onload = resolve;
-    img.onerror = reject;
+function adjustAvatar( base64Data, compressionQualityPercentage = 0, allowGif = false ) {
+  return new Promise((resolve, reject) => {
+    let img = new Image();
+
+    img.onload = () => {
+      let canvas = document.createElement("canvas");
+      let ctx = canvas.getContext("2d");
+      let targetWidth = 100;
+      let targetHeight = 100;
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+      let mimeTypeMatch = base64Data.match(/^data:(image\/[^;]+);base64,/);
+      let isGifInput = mimeTypeMatch && mimeTypeMatch[1] === "image/gif";
+      let outputMimeType;
+      if (isGifInput) {
+        if (allowGif) {
+          outputMimeType = "image/png";
+        } else {
+          outputMimeType = "image/webp";
+        }
+      } else {
+        outputMimeType = "image/webp";
+      }
+      let clampedCompressionPercentage = Math.max(
+        0,
+        Math.min(100, compressionQualityPercentage)
+      );
+      let quality = 1 - clampedCompressionPercentage / 100;
+      let resizedBase64;
+      if (outputMimeType === "image/webp") {
+        resizedBase64 = canvas.toDataURL(outputMimeType, quality);
+      } else {
+        resizedBase64 = canvas.toDataURL(outputMimeType);
+      }
+      resolve(resizedBase64);
+    };
+
+    img.onerror = (error) => {
+      console.error("Error loading image for resizing:", error);
+      reject(new Error("Failed to load image for resizing."));
+    };
+
+    img.src = base64Data;
   });
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, width, height);
-  ctx.drawImage(img, 0, 0, width, height);
-  const compressedBase64 = canvas.toDataURL("image/webp", quality);
-  return compressedBase64;
 }
 
 async function init() {
@@ -178,9 +206,9 @@ async function change_avatar(uuid, newValue) {
     if (sub_level.success) {
       let newImage;
       if (sub_level.message === "0") {
-        newImage = await scaleAndCompressImage(newValue)
+        newImage = await adjustAvatar(newValue, 60, false)
       } else {
-        newImage = newValue
+        newImage = await adjustAvatar(newValue, 0, true)
       }
 
       let connection = await pool.getConnection();
