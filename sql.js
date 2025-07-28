@@ -16,9 +16,9 @@ async function adjustAvatar(base64Input, bypass = false, quality = 80) {
     }
     let inputBuffer = Buffer.from(base64Data, 'base64');
     let compressedBuffer = await sharp(inputBuffer)
-      .jpeg({ quality })
+      .webp({ quality })
       .toBuffer();
-    let compressedBase64 = `data:image/jpeg;base64,${compressedBuffer.toString(
+    let compressedBase64 = `data:image/webp;base64,${compressedBuffer.toString(
       'base64'
     )}`;
     return compressedBase64;
