@@ -60,7 +60,7 @@ async function createUsersTable() {
       username VARCHAR(255) NOT NULL UNIQUE,
       created_at VARCHAR(255) NOT NULL,
       display VARCHAR(255),
-      avatar MEDIUMTEXT,
+      avatar TEXT(3000000),
       about VARCHAR(200),
       status VARCHAR(15),
       sub_level INT NOT NULL,
