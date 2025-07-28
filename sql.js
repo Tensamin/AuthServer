@@ -1,20 +1,18 @@
 import mysql from 'mysql2/promise';
 import 'dotenv/config';
 import * as schedule from "node-schedule"
+import { createCanvas, Image } from 'canvas';
 
 let pool;
 
-function adjustAvatar( base64Data, compressionQualityPercentage = 0, allowGif = false ) {
+function adjustAvatar(base64Data, compressionQualityPercentage = 0, allowGif = false) {
   return new Promise((resolve, reject) => {
     let img = new Image();
-
     img.onload = () => {
-      let canvas = document.createElement("canvas");
-      let ctx = canvas.getContext("2d");
       let targetWidth = 100;
       let targetHeight = 100;
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
+      let canvas = createCanvas(targetWidth, targetHeight);
+      let ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
       let mimeTypeMatch = base64Data.match(/^data:(image\/[^;]+);base64,/);
       let isGifInput = mimeTypeMatch && mimeTypeMatch[1] === "image/gif";
@@ -35,18 +33,16 @@ function adjustAvatar( base64Data, compressionQualityPercentage = 0, allowGif = 
       let quality = 1 - clampedCompressionPercentage / 100;
       let resizedBase64;
       if (outputMimeType === "image/webp") {
-        resizedBase64 = canvas.toDataURL(outputMimeType, quality);
+        resizedBase64 = canvas.toDataURL(outputMimeType, { quality: quality });
       } else {
         resizedBase64 = canvas.toDataURL(outputMimeType);
       }
       resolve(resizedBase64);
     };
-
     img.onerror = (error) => {
       console.error("Error loading image for resizing:", error);
       reject(new Error("Failed to load image for resizing."));
     };
-
     img.src = base64Data;
   });
 }
@@ -221,10 +217,10 @@ async function change_avatar(uuid, newValue) {
         return { success: false, message: 'UUID not found.' };
       };
 
-      return { success: true, message: "Changed avatar" } 
-  } else {
-    return { success: false, message: sub_level.message}
-  }
+      return { success: true, message: "Changed avatar" }
+    } else {
+      return { success: false, message: sub_level.message }
+    }
   } catch (err) {
     return { success: false, message: err.message };
   };
