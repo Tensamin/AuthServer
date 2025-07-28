@@ -210,8 +210,6 @@ async function change_avatar(uuid, newValue) {
       } else {
         newImage = await adjustAvatar(newValue, 0, true)
       }
-      console.log(newImage)
-      console.log(newImage.length)
 
       let connection = await pool.getConnection();
       let [res] = await connection.execute(`
