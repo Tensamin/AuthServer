@@ -1,50 +1,30 @@
 import mysql from 'mysql2/promise';
 import 'dotenv/config';
 import * as schedule from "node-schedule"
-import { createCanvas, Image } from 'canvas';
 
 let pool;
 
-function adjustAvatar(base64Data, compressionQualityPercentage = 0, allowGif = false) {
-  return new Promise((resolve, reject) => {
-    let img = new Image();
-    img.onload = () => {
-      let targetWidth = 100;
-      let targetHeight = 100;
-      let canvas = createCanvas(targetWidth, targetHeight);
-      let ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-      let mimeTypeMatch = base64Data.match(/^data:(image\/[^;]+);base64,/);
-      let isGifInput = mimeTypeMatch && mimeTypeMatch[1] === "image/gif";
-      let outputMimeType;
-      if (isGifInput) {
-        if (allowGif) {
-          outputMimeType = "image/png";
-        } else {
-          outputMimeType = "image/webp";
-        }
-      } else {
-        outputMimeType = "image/webp";
-      }
-      let clampedCompressionPercentage = Math.max(
-        0,
-        Math.min(100, compressionQualityPercentage)
-      );
-      let quality = 1 - clampedCompressionPercentage / 100;
-      let resizedBase64;
-      if (outputMimeType === "image/webp") {
-        resizedBase64 = canvas.toDataURL(outputMimeType, { quality: quality });
-      } else {
-        resizedBase64 = canvas.toDataURL(outputMimeType);
-      }
-      resolve(resizedBase64);
-    };
-    img.onerror = (error) => {
-      console.error("Error loading image for resizing:", error);
-      reject(new Error("Failed to load image for resizing."));
-    };
-    img.src = base64Data;
-  });
+async function adjustAvatar(base64Input, bypass = false, quality = 80) {
+  if (bypass || !base64Input) {
+    return base64Input;
+  }
+  try {
+    let base64Data = base64Input.split(';base64,').pop();
+    if (!base64Data) {
+      throw new Error('Invalid base64 input string.');
+    }
+    let inputBuffer = Buffer.from(base64Data, 'base64');
+    let compressedBuffer = await sharp(inputBuffer)
+      .jpeg({ quality })
+      .toBuffer();
+    let compressedBase64 = `data:image/jpeg;base64,${compressedBuffer.toString(
+      'base64'
+    )}`;
+    return compressedBase64;
+  } catch (error) {
+    console.error('Error during Node.js image compression:', error);
+    throw error;
+  }
 }
 
 async function init() {
@@ -202,9 +182,9 @@ async function change_avatar(uuid, newValue) {
     if (sub_level.success) {
       let newImage;
       if (sub_level.message === "0") {
-        newImage = await adjustAvatar(newValue, 60, false)
+        newImage = await adjustAvatar(newValue, false, 60)
       } else {
-        newImage = await adjustAvatar(newValue, 0, true)
+        newImage = await adjustAvatar(newValue, true, 0)
       }
 
       let connection = await pool.getConnection();
