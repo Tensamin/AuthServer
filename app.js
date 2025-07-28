@@ -180,8 +180,10 @@ app.get('/api/:uuid', async (req, res) => {
         let aboutData = await db.get_about(uuid);
         let statusData = await db.get_status(uuid);
         let publicKeyData = await db.get_public_key(uuid);
+        let subLevelData = await db.get_sub_level(uuid);
+        let subEndData = await db.get_sub_end(uuid);
 
-        if (createdAtData.success && usernameData.success && displayData.success && avatarData.success && aboutData.success && statusData.success && publicKeyData.success) {
+        if (createdAtData.success && usernameData.success && displayData.success && avatarData.success && aboutData.success && statusData.success && publicKeyData.success && subLevelData.success && subEndData.success) {
             res.json({
                 type: "message",
                 log: {
@@ -196,6 +198,8 @@ app.get('/api/:uuid', async (req, res) => {
                     about: aboutData.message,
                     status: statusData.message,
                     public_key: publicKeyData.message,
+                    sub_level: subLevelData.message,
+                    sub_end: subEndData.message,
                 },
             })
         }
