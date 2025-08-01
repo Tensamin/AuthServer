@@ -169,6 +169,44 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+app.get('/api/user/:username', async (req, res) => {
+    let username = req.params.username;
+
+    try {
+        let data = await db.get_uuid(username);
+        if (data.success) {
+            res.json({
+                type: "message",
+                log: {
+                    message: `Get uuid for ${username}: ${data.message}`,
+                    log_level: 0,
+                },
+                data: {
+                    uuid: data.uuid,
+                }
+            })
+        } else {
+            res.status(500).json({
+                type: "error",
+                log: {
+                    message: `Failed to get uuid for ${username}: ${data.message}`,
+                    log_level: 1,
+                },
+                data: {},
+            })
+        }
+    } catch (err) {
+        res.status(500).json({
+            type: "error",
+            log: {
+                message: `Failed to get uuid for ${username}: ${err.message}`,
+                log_level: 1,
+            },
+            data: {},
+        })
+    }
+})
+
 app.get('/api/:uuid', async (req, res) => {
     let uuid = req.params.uuid;
 

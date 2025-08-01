@@ -319,14 +319,14 @@ async function changeUser_public_key_and_private_key_hash(uuid, token, newPublic
   };
 };
 
-async function usernameToUUID(username) {
+async function get_uuid(username) {
   try {
     let connection = await pool.getConnection();
     let [rows] = await connection.execute(`SELECT uuid FROM users WHERE username = ?;`, [username]);
     connection.release();
 
     if (rows.length === 0) {
-      return { success: false, message: 'Username not found.' };
+      return { success: false, message: 'UUID not found.' };
     };
 
     return { success: true, message: rows[0].uuid };
@@ -600,5 +600,5 @@ export {
   get_status,
   get_sub_level,
   get_sub_end,
-  usernameToUUID,
+  get_uuid,
 };
