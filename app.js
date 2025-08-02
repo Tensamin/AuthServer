@@ -405,6 +405,67 @@ app.get('/api/:uuid/public-key', async (req, res) => {
     }
 });
 
+app.get('/api/:uuid/private-key-hash', async (req, res) => {
+    let uuid = req.params.uuid;
+    if (req.headers.authorization && req.headers.private_key_hash) {
+        let omikron_exists = await db.get_omikron_uuids(req.headers.authorization)
+
+        if (omikron_exists.success) {
+            try {
+                let data = await db.get_private_key_hash(uuid)
+                if (data.success) {
+                    res.json({
+                        type: "message",
+                        log: {
+                            message: `Get private_key_hash for ${uuid}: ${data.message}`,
+                            log_level: 0,
+                        },
+                        data: {
+                            matches: req.headers.private_key_hash === data.message,
+                        }
+                    })
+                } else {
+                    res.status(500).json({
+                        type: "error",
+                        log: {
+                            message: `Failed to get private_key_hash for ${uuid}: ${data.message}`,
+                            log_level: 1,
+                        },
+                        data: {},
+                    })
+                }
+            } catch (err) {
+                res.status(500).json({
+                    type: "error",
+                    log: {
+                        message: `Failed to get private_key_hash for ${uuid}: ${err.message}`,
+                        log_level: 1,
+                    },
+                    data: {},
+                })
+            }
+        } else {
+            res.status(401).json({
+                type: "error",
+                log: {
+                    message: `Tried to access private_key_hash for ${uuid}: Permission Denied`,
+                    log_level: 1,
+                },
+                data: {},
+            })
+        }
+    } else {
+        res.status(401).json({
+            type: "error",
+            log: {
+                message: `Tried to access private_key_hash for ${uuid}: Permission Denied`,
+                log_level: 1,
+            },
+            data: {},
+        })
+    }
+})
+
 app.get('/api/:uuid/iota-id', async (req, res) => {
     let uuid = req.params.uuid;
     if (req.headers.authorization) {
