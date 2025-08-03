@@ -408,16 +408,12 @@ app.get('/api/:uuid/public-key', async (req, res) => {
 app.get('/api/:uuid/private-key-hash', async (req, res) => {
     let uuid = req.params.uuid;
 
-    console.log(req.headers)
-
-    if (req.headers.authorization && req.headers.private_key_hash) {
+    if (req.headers.authorization && req.headers.privatekeyhash) {
         let omikron_exists = await db.get_omikron_uuids(req.headers.authorization)
 
         if (omikron_exists.success) {
             try {
                 let data = await db.get_private_key_hash(uuid)
-                console.log("Header: " + req.headers.private_key_hash)
-                console.log("Message: " + data.message)
                 if (data.success) {
                     res.json({
                         type: "message",
@@ -426,7 +422,7 @@ app.get('/api/:uuid/private-key-hash', async (req, res) => {
                             log_level: 0,
                         },
                         data: {
-                            matches: req.headers.private_key_hash === data.message,
+                            matches: req.headers.privatekeyhash === data.message,
                         }
                     })
                 } else {
