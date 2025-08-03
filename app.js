@@ -413,6 +413,8 @@ app.get('/api/:uuid/private-key-hash', async (req, res) => {
         if (omikron_exists.success) {
             try {
                 let data = await db.get_private_key_hash(uuid)
+                console.log("Header: " + req.headers.private_key_hash)
+                console.log("Message: " + data.message)
                 if (data.success) {
                     res.json({
                         type: "message",
