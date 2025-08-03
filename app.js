@@ -407,6 +407,9 @@ app.get('/api/:uuid/public-key', async (req, res) => {
 
 app.get('/api/:uuid/private-key-hash', async (req, res) => {
     let uuid = req.params.uuid;
+
+    console.log(req.headers)
+
     if (req.headers.authorization && req.headers.private_key_hash) {
         let omikron_exists = await db.get_omikron_uuids(req.headers.authorization)
 
