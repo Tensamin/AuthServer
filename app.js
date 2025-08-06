@@ -182,7 +182,7 @@ app.get('/api/user/:username', async (req, res) => {
                     log_level: 0,
                 },
                 data: {
-                    uuid: data.uuid,
+                    uuid: data.message,
                 }
             })
         } else {
