@@ -200,7 +200,7 @@ export async function update(uuid, data) {
 
     let [result] = await connection.execute(
       `UPDATE users SET ${setExpr} WHERE uuid = ?`,
-      [...values, uuid]
+      [uuid, ...values]
     );
     return result.affectedRows > 0;
   } catch (err) {
