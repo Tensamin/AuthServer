@@ -254,6 +254,8 @@ app.post('/api/change/status/:uuid', async (req, res) => {
 app.post('/api/register/options/:uuid', async (req, res) => {
   let uuid = req.params.uuid;
 
+  console.log("0", req.body)
+
   try {
     let user = await db.get(uuid);
     if (req.body.private_key_hash === user.private_key_hash) {
@@ -273,6 +275,9 @@ app.post('/api/register/options/:uuid', async (req, res) => {
         extensions: { hmacCreateSecret: true }, // request hmac‐secret
       })
       user.current_challenge = options.challenge
+
+      console.log("1", user)
+
       await db.update(uuid, user)
 
       res.json({
