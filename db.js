@@ -174,7 +174,6 @@ export async function get(uuid) {
     );
     return rows[0] ?? null;
   } catch (err) {
-    console.error('get() DB error', err);
     throw err;
   } finally {
     if (connection) connection.release();
@@ -183,6 +182,7 @@ export async function get(uuid) {
 
 export async function update(uuid, data) {
   let connection;
+  console.log(data)
   try {
     let { setExpr, values } = prepareUpdateEntries(data);
     if (!setExpr) return false;
@@ -197,16 +197,12 @@ export async function update(uuid, data) {
 
     connection = await pool.getConnection();
 
-    console.log('SQL:', `UPDATE users SET ${setExpr} WHERE uuid = ?`);
-    console.log('VALUES:', [...values, uuid]);
-
     let [result] = await connection.execute(
       `UPDATE users SET ${setExpr} WHERE uuid = ?`,
       [...values, uuid]
     );
     return result.affectedRows > 0;
   } catch (err) {
-    console.error('update() DB error', { err, data });
     throw err;
   } finally {
     if (connection) connection.release();
