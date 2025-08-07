@@ -118,7 +118,7 @@ app.post('/api/change/username/:uuid', async (req, res) => {
             let user = await db.get(uuid);
             if (req.body.private_key_hash === user.private_key_hash) {
                 user.username = req.body.username;
-                await db.change(uuid, user);
+                await db.update(uuid, user);
                 res.json({
                     type: "success",
                     log: {
@@ -146,7 +146,7 @@ app.post('/api/change/display/:uuid', async (req, res) => {
             let user = await db.get(uuid);
             if (req.body.private_key_hash === user.private_key_hash) {
                 user.display = req.body.display;
-                await db.change(uuid, user);
+                await db.update(uuid, user);
                 res.json({
                     type: "success",
                     log: {
@@ -174,7 +174,7 @@ app.post('/api/change/avatar/:uuid', async (req, res) => {
             let user = await db.get(uuid);
             if (req.body.private_key_hash === user.private_key_hash) {
                 user.avatar = adjustAvatar(req.body.avatar, user.sub_level >= 1);
-                await db.change(uuid, user);
+                await db.update(uuid, user);
                 res.json({
                     type: "success",
                     log: {
@@ -202,7 +202,7 @@ app.post('/api/change/about/:uuid', async (req, res) => {
             let user = await db.get(uuid);
             if (req.body.private_key_hash === user.private_key_hash) {
                 user.about = btoa(req.body.about);
-                await db.change(uuid, user);
+                await db.update(uuid, user);
                 res.json({
                     type: "success",
                     log: {
@@ -230,7 +230,7 @@ app.post('/api/change/status/:uuid', async (req, res) => {
             let user = await db.get(uuid);
             if (req.body.private_key_hash === user.private_key_hash) {
                 user.status = req.body.status;
-                await db.change(uuid, user);
+                await db.update(uuid, user);
                 res.json({
                     type: "success",
                     log: {
