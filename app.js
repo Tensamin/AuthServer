@@ -377,35 +377,28 @@ app.get('/api/login/options/:uuid', async (req, res) => {
     let uuid = req.params.uuid;
 
     try {
-        console.log("1");
         let user = await db.get(uuid);
-        console.log("2");
         let cred = user.credentials[0];
-        console.log("3");
         if (!user?.credentials?.length) {
             throw new Error("No credentials registered for this user");
         }
-        console.log("4");
         let options = await generateAuthenticationOptions({
             allowCredentials: [
                 {
                     id: cred.credID,
-                    type: 'public-key',
                     transports: ['usb', 'ble', 'nfc', 'internal']
                 }
             ],
             userVerification: 'required',
             rpID,
         })
-        console.log("5");
+        console.log(user.salt)
+        console.log(Buffer.from(user.salt, "base64"))
         options.extensions = {
             hmacGetSecret: { salt1: Buffer.from(user.salt, "base64") },
         }
-        console.log("6");
         user.current_challenge = options.challenge;
-        console.log("7");
         await db.update(uuid, user);
-        console.log("8");
         res.json({
             type: "success",
             log: {
