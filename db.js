@@ -40,14 +40,16 @@ async function createUsersTable() {
       iota_id VARCHAR(255) NOT NULL,
       token VARCHAR(255) NOT NULL UNIQUE,
       username VARCHAR(15) NOT NULL UNIQUE,
-      created_at VARCHAR(255) NOT NULL,
+      created_at BIGINT NOT NULL,
       display VARCHAR(15),
       avatar MEDIUMTEXT,
       about VARCHAR(200),
       status VARCHAR(15),
       sub_level INT NOT NULL,
       sub_end BIGINT NOT NULL,
-      webauthn TEXT
+      salt TEXT,
+      current_challenge TEXT,
+      credentials JSON
     );
   `;
   try {

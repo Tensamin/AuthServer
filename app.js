@@ -6,10 +6,21 @@ import { v7 } from "uuid";
 import * as db from "./db.js";
 import "dotenv/config";
 
+import { randomBytes } from 'crypto'
+import base64url from 'base64url'
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from '@simplewebauthn/server'
+
 // Variables
 let port = process.env.PORT || 9187;
 let app = express();
 let userCreations = [];
+let rpID = 'tensamin';
+let rpName = 'Tensamin';
 let origin = "https://tensamin.methanium.net";
 
 // Environment
@@ -238,6 +249,187 @@ app.post('/api/change/status/:uuid', async (req, res) => {
             }
         })
     }
+});
+
+app.post('/api/register/options/:uuid', async (req, res) => {
+  let uuid = req.params.uuid;
+
+  try {
+    let user = await db.get(uuid);
+    if (req.body.private_key_hash === user.private_key_hash) {
+      let salt = randomBytes(32)
+      let saltB64 = base64url(salt)
+      user.salt = saltB64
+      user.credentials = []
+      let options = generateRegistrationOptions({
+        rpName,
+        rpID,
+        userID: uuid,
+        userName: user.username,
+        userDisplayName: user.display,
+        attestationType: 'none',
+        authenticatorSelection: { userVerification: 'required' },
+        supportedAlgorithmIDs: [-7],            // ES256
+        extensions: { hmacCreateSecret: true }, // request hmac‐secret
+      })
+      user.current_challenge = options.challenge
+      await db.update(uuid, user)
+
+      res.json({
+        type: "success",
+        log: {
+          message: `Got registration options for ${uuid}`,
+          log_level: 2
+        },
+        data: {
+          options,
+          salt: saltB64
+        }
+      })
+    } else throw new Error("Permission Denied")
+  } catch (err) {
+    res.json({
+      type: "error",
+      log: {
+        message: `Failed to get registration options for ${uuid}: ${err.message}`,
+        log_level: 2
+      }
+    })
+  }
+});
+
+app.post('/api/register/verify/:uuid', async (req, res) => {
+  let uuid = req.params.uuid;
+
+  try {
+    let user = await db.get(uuid);
+    if (req.body.private_key_hash === user.private_key_hash) {
+      let verification = await verifyRegistrationResponse({
+        response: req.body.attestation,
+        expectedChallenge: user.current_challenge,
+        expectedOrigin: origin,
+        expectedRPID: rpID,
+        requireUserVerification: true,
+      })
+      let { verified, registrationInfo } = verification;
+      if (verified && registrationInfo) {
+        let {
+          credentialID,
+          credentialPublicKey,
+          counter,
+        } = registrationInfo;
+        user.credentials.push({
+          credID: base64url(credentialID),
+          publicKey: base64url(credentialPublicKey),
+          counter,
+        })
+        await db.update(uuid, user);
+        res.json({
+          type: "success",
+          log: {
+            message: `Verified ${uuid}`,
+            log_level: 2
+          }
+        })
+      } else throw new Error("Verification Failed")
+    } else throw new Error("Permission Denied")
+  } catch (err) {
+    res.json({
+      type: "error",
+      log: {
+        message: `Failed to verify ${uuid}: ${err.message}`,
+        log_level: 2
+      }
+    })
+  }
+});
+
+app.get('/api/login/options/:uuid', async (req, res) => {
+  let uuid = req.params.uuid;
+
+  try {
+    let user = await db.get(uuid);
+    let cred = user.credentials[0];
+    let options = await generateAuthenticationOptions({
+      allowCredentials: [
+        {
+          id: base64url.toBuffer(cred.credID),
+          type: 'public-key',
+          transports: ['usb', 'ble', 'nfc', 'internal']
+        }
+      ],
+      userVerification: 'required',
+      rpID,
+    })
+    options.extensions = {
+      hmacGetSecret: { salt1: base64url.toBuffer(user.salt) },
+    }
+    user.current_challenge = options.challenge;
+    await db.update(uuid, user);
+    res.json({
+      type: "success",
+      log: {
+        message: `Got login options for ${uuid}`,
+        log_level: 2
+      },
+      data: {
+        options,
+        salt: user.salt,
+        credential_id: cred.credID,
+      }
+    })
+  } catch (err) {
+    res.json({
+      type: "error",
+      log: {
+        message: `Failed to get login options for ${uuid}: ${err.message}`,
+        log_level: 2
+      }
+    })
+  }
+});
+
+app.post('/api/login/verify/:uuid', async (req, res) => {
+  let uuid = req.params.uuid;
+
+  try {
+    if (req.body.assertion) {
+      let user = await db.get(uuid)
+      let cred = user.credentials[0];
+      let verification = await verifyAuthenticationResponse({
+        response: req.body.assertion,
+        expectedChallenge: user.current_challenge,
+        expectedOrigin: origin,
+        expectedRPID: rpID,
+        authenticator: {
+          publicKey: base64url.toBuffer(cred.publicKey),
+          credentialID: base64url.toBuffer(cred.credID),
+          counter: cred.counter,
+        },
+        requireUserVerification: true,
+      })
+      let { verified, authenticationInfo } = verification;
+      if (verified) {
+        cred.counter = authenticationInfo.newCounter
+        await db.update(uuid, user)
+        res.json({
+          type: "success",
+          log: {
+            message: `Verified ${uuid}`,
+            log_level: 2
+          }
+        })
+      } else throw new Error("Verification Failed")
+    } else throw new Error("Missing Values");
+  } catch (err) {
+    res.json({
+      type: "error",
+      log: {
+        message: `Failed to verify ${uuid}: ${err.message}`,
+        log_level: 2
+      }
+    })
+  }
 });
 
 // Deprecated
