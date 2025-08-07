@@ -456,8 +456,8 @@ app.listen(port, async () => {
 });
 
 // Database Disconnect Cleanup
-process.on('SIGINT', await db.close());
-process.on('SIGTERM', await db.close());
+process.on('SIGINT', db.close);
+process.on('SIGTERM', db.close);
 process.on('uncaughtException', async (err) => {
     console.error('Uncaught Exception:', err);
     await db.close();
