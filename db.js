@@ -76,7 +76,7 @@ async function createUsersTable() {
       status VARCHAR(15),
       sub_level INT NOT NULL,
       sub_end BIGINT NOT NULL,
-      salt TEXT,
+      lambda TEXT,
       current_challenge TEXT,
       credentials TEXT
     );
