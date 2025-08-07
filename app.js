@@ -1,113 +1,246 @@
 // Imports
-import express from 'express';
+import express from "express";
 import cors from "cors";
-import { v7 } from 'uuid';
-import * as db from './sql.js';
+import sharp from "sharp"
+import { v7 } from "uuid";
+import * as db from "./db.js";
 import "dotenv/config";
 
 // Variables
 let port = process.env.PORT || 9187;
 let app = express();
-let userCreations = {};
+let userCreations = [];
+let origin = "https://tensamin.methanium.net";
 
 // Environment
-app.use(cors());
+app.use(cors({ origin: origin, credentials: true }));
 app.use(express.json({ limit: "16mb" }));
 app.use(express.urlencoded({ extended: true, limit: "16mb" }));
 
-// API Endpoints
-app.get('/api/register/init', async (req, res) => {
-    class UserCreationProcess {
-        constructor() { this.uuid = v7() };
-    };
+// Avatar Function
+async function adjustAvatar(base64Input, bypass = false, quality = 80) {
+  if (bypass) {
+    return base64Input;
+  }
+  try {
+    let base64Data = base64Input.split(';base64,').pop();
+    if (!base64Data) {
+      throw new Error('Invalid base64 input string.');
+    }
+    let inputBuffer = Buffer.from(base64Data, 'base64');
+    let compressedBuffer = await sharp(inputBuffer)
+      .webp({ quality })
+      .toBuffer();
+    let compressedBase64 = `data:image/webp;base64,${compressedBuffer.toString(
+      'base64'
+    )}`;
+    return compressedBase64;
+  } catch (err) {
+    throw new Error(err.message);
+  }
+}
 
-    let newUser = new UserCreationProcess();
-    userCreations[newUser.uuid] = newUser;
-    res.send({
-        type: "message",
-        log: {
-            message: "Started user registration progress",
-            log_level: 0,
-        },
-        data: {
-            user_id: newUser.uuid,
-        },
-    });
+// User Endpoints
+app.get('/api/get/uuid/:username', async (req, res) => {
+    let username = req.params.username;
 
-    setTimeout(() => {
-        if (userCreations[newUser.uuid]) {
-            delete userCreations[newUser.uuid];
-        };
-    }, 3600000);
-});
-
-app.post('/api/register/complete', async (req, res) => {
     try {
-        if ("uuid" in req.body &&
-            "username" in req.body &&
-            "public_key" in req.body &&
-            "private_key_hash" in req.body &&
-            "username" in req.body &&
-            "iota_id" in req.body) {
-
-            let tokenPart1 = v7();
-            let tokenPart2 = v7();
-            let tokenPart3 = v7();
-            let reset_token = `${tokenPart1}.${tokenPart2}.${tokenPart3}`;
-
-            let newUsername = req.body.username.toLowerCase().replace(/[^a-z0-9_]/g, '');
-
-            if (userCreations[req.body.uuid]) {
-                db.addUser(
-                    req.body.uuid,
-                    req.body.public_key,
-                    req.body.private_key_hash,
-                    newUsername,
-                    reset_token,
-                    req.body.iota_id,
-                    new Date().getTime(),
-                );
-                delete userCreations[req.body.uuid];
-            } else {
-                res.status(400).json({
-                    type: "error",
-                    log: {
-                        message: "User creation failed do to invalid UUID",
-                        log_level: 1,
-                    },
-                    data: {},
-                });
+        let uuid = await db.uuid(username);
+        res.json({
+            type: "success",
+            log: {
+                message: `Got uuid for ${username}`,
+                log_level: 0,
+            },
+            data: {
+                uuid,
             }
-            res.json({
-                type: "message",
-                log: {
-                    message: `Created User: ${req.body.uuid}`,
-                    log_level: 0,
-                },
-                data: {},
-            });
-        } else {
-            res.status(400).json({
-                type: "error",
-                log: {
-                    message: "User creation failed do to missing values",
-                    log_level: 1,
-                },
-                data: {},
-            });
-        };
+        })
     } catch (err) {
-        res.status(500).json({
+        res.json({
             type: "error",
             log: {
-                message: err.message,
+                message: `Failed to get uuid for ${username}: ${err.message}`,
                 log_level: 1,
+            }
+        })
+    }
+})
+
+app.get('/api/get/:uuid', async (req, res) => {
+    let uuid = req.params.uuid;
+    try {
+        let { created_at, username, display, avatar, about, status, public_key, sub_level, sub_end } = await db.get(uuid);
+        res.json({
+            type: "success",
+            log: {
+                message: `Got user ${uuid}`,
+                log_level: 0,
             },
-            data: {},
+            data: {
+                created_at,
+                username,
+                display,
+                avatar,
+                about,
+                status,
+                public_key,
+                sub_level,
+                sub_end,
+            },
+        })
+    } catch (err) {
+        res.json({
+            type: "error",
+            log: {
+                message: `Failed to get user for ${uuid}: ${err.message}`,
+                log_level: 1,
+            }
         })
     }
 });
 
+app.post('/api/change/username/:uuid', async (req, res) => {
+    let uuid = req.params.uuid;
+    try {
+        if ("private_key_hash" in req.body && "username" in req.body) {
+            let user = await db.get(uuid);
+            if (req.body.private_key_hash === user.private_key_hash) {
+                user.username = req.body.username;
+                await db.change(uuid, user);
+                res.json({
+                    type: "success",
+                    log: {
+                        message: `Changed username for ${uuid}`,
+                        log_level: 0,
+                    }
+                })
+            } else throw new Error("Permission Denied")
+        } else throw new Error("Missing Values")
+    } catch (err) {
+        res.json({
+            type: "error",
+            log: {
+                message: `Failed to change username for ${uuid}: ${err.message}`,
+                log_level: 0,
+            }
+        })
+    }
+});
+
+app.post('/api/change/display/:uuid', async (req, res) => {
+    let uuid = req.params.uuid;
+    try {
+        if ("private_key_hash" in req.body && "display" in req.body) {
+            let user = await db.get(uuid);
+            if (req.body.private_key_hash === user.private_key_hash) {
+                user.display = req.body.display;
+                await db.change(uuid, user);
+                res.json({
+                    type: "success",
+                    log: {
+                        message: `Changed display for ${uuid}`,
+                        log_level: 0,
+                    }
+                })
+            } else throw new Error("Permission Denied")
+        } else throw new Error("Missing Values")
+    } catch (err) {
+        res.json({
+            type: "error",
+            log: {
+                message: `Failed to change display for ${uuid}: ${err.message}`,
+                log_level: 0,
+            }
+        })
+    }
+});
+
+app.post('/api/change/avatar/:uuid', async (req, res) => {
+    let uuid = req.params.uuid;
+    try {
+        if ("private_key_hash" in req.body && "avatar" in req.body) {
+            let user = await db.get(uuid);
+            if (req.body.private_key_hash === user.private_key_hash) {
+                user.avatar = adjustAvatar(req.body.avatar, user.sub_level >= 1);
+                await db.change(uuid, user);
+                res.json({
+                    type: "success",
+                    log: {
+                        message: `Changed avatar for ${uuid}`,
+                        log_level: 0,
+                    }
+                })
+            } else throw new Error("Permission Denied")
+        } else throw new Error("Missing Values")
+    } catch (err) {
+        res.json({
+            type: "error",
+            log: {
+                message: `Failed to change avatar for ${uuid}: ${err.message}`,
+                log_level: 0,
+            }
+        })
+    }
+});
+
+app.post('/api/change/about/:uuid', async (req, res) => {
+    let uuid = req.params.uuid;
+    try {
+        if ("private_key_hash" in req.body && "about" in req.body) {
+            let user = await db.get(uuid);
+            if (req.body.private_key_hash === user.private_key_hash) {
+                user.about = btoa(req.body.about);
+                await db.change(uuid, user);
+                res.json({
+                    type: "success",
+                    log: {
+                        message: `Changed about for ${uuid}`,
+                        log_level: 0,
+                    }
+                })
+            } else throw new Error("Permission Denied")
+        } else throw new Error("Missing Values")
+    } catch (err) {
+        res.json({
+            type: "error",
+            log: {
+                message: `Failed to change about for ${uuid}: ${err.message}`,
+                log_level: 0,
+            }
+        })
+    }
+});
+
+app.post('/api/change/status/:uuid', async (req, res) => {
+    let uuid = req.params.uuid;
+    try {
+        if ("private_key_hash" in req.body && "status" in req.body) {
+            let user = await db.get(uuid);
+            if (req.body.private_key_hash === user.private_key_hash) {
+                user.status = req.body.status;
+                await db.change(uuid, user);
+                res.json({
+                    type: "success",
+                    log: {
+                        message: `Changed status for ${uuid}`,
+                        log_level: 0,
+                    }
+                })
+            } else throw new Error("Permission Denied")
+        } else throw new Error("Missing Values")
+    } catch (err) {
+        res.json({
+            type: "error",
+            log: {
+                message: `Failed to change status for ${uuid}: ${err.message}`,
+                log_level: 0,
+            }
+        })
+    }
+});
+
+// Deprecated
 app.post('/api/login', async (req, res) => {
     try {
         let data = req.body
@@ -169,744 +302,149 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-app.get('/api/user/:username', async (req, res) => {
-    let username = req.params.username;
+// Iota Endpoints
+app.get('/api/register/init', async (req, res) => {
+    let newUser = v7();
+    userCreations.push(newUser);
+    res.send({
+        type: "success",
+        log: {
+            message: "Started user registration progress",
+            log_level: 0,
+        },
+        data: {
+            user_id: newUser,
+        },
+    });
 
-    try {
-        let data = await db.get_uuid(username);
-        if (data.success) {
-            res.json({
-                type: "message",
-                log: {
-                    message: `Get uuid for ${username}: ${data.message}`,
-                    log_level: 0,
-                },
-                data: {
-                    uuid: data.message,
-                }
-            })
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to get uuid for ${username}: ${data.message}`,
-                    log_level: 1,
-                },
-                data: {},
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to get uuid for ${username}: ${err.message}`,
-                log_level: 1,
-            },
-            data: {},
-        })
-    }
-})
-
-app.get('/api/:uuid', async (req, res) => {
-    let uuid = req.params.uuid;
-
-    try {
-        let createdAtData = await db.get_created_at(uuid);
-        let usernameData = await db.get_username(uuid);
-        let displayData = await db.get_display(uuid);
-        let avatarData = await db.get_avatar(uuid);
-        let aboutData = await db.get_about(uuid);
-        let statusData = await db.get_status(uuid);
-        let publicKeyData = await db.get_public_key(uuid);
-        let subLevelData = await db.get_sub_level(uuid);
-        let subEndData = await db.get_sub_end(uuid);
-
-        if (createdAtData.success && usernameData.success && displayData.success && avatarData.success && aboutData.success && statusData.success && publicKeyData.success && subLevelData.success && subEndData.success) {
-            res.json({
-                type: "message",
-                log: {
-                    message: `Get user for ${uuid}`,
-                    log_level: 0,
-                },
-                data: {
-                    created_at: createdAtData.message,
-                    username: usernameData.message,
-                    display: displayData.message,
-                    avatar: avatarData.message,
-                    about: aboutData.message,
-                    status: statusData.message,
-                    public_key: publicKeyData.message,
-                    sub_level: subLevelData.message,
-                    sub_end: subEndData.message,
-                },
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to get user for ${uuid}: ${err.message}`,
-                log_level: 1,
-            },
-            data: {},
-        })
-    }
+    setTimeout(() => {
+        if (userCreations.includes(newUser)) {
+            userCreations.shift(newUser);
+        };
+    }, 3600000);
 });
 
-app.get('/api/:uuid/username', async (req, res) => {
-    let uuid = req.params.uuid;
-
+app.post('/api/register/complete', async (req, res) => {
     try {
-        let data = await db.get_username(uuid);
-        if (data.success) {
-            res.json({
-                type: "message",
-                log: {
-                    message: `Get username for ${uuid}: ${data.message}`,
-                    log_level: 0,
-                },
-                data: {
-                    username: data.message,
-                }
-            })
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to get username for ${uuid}: ${data.message}`,
-                    log_level: 1,
-                },
-                data: {},
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to get username for ${uuid}: ${err.message}`,
-                log_level: 1,
-            },
-            data: {},
-        })
-    }
-});
+        if ("uuid" in req.body &&
+            "username" in req.body &&
+            "public_key" in req.body &&
+            "private_key_hash" in req.body &&
+            "username" in req.body &&
+            "iota_id" in req.body) {
 
-app.get('/api/:uuid/display', async (req, res) => {
-    let uuid = req.params.uuid;
+            let tokenPart1 = v7();
+            let tokenPart2 = v7();
+            let tokenPart3 = v7();
+            let reset_token = `${tokenPart1}.${tokenPart2}.${tokenPart3}`;
 
-    try {
-        let data = await db.get_display(uuid);
-        if (data.success) {
-            res.json({
-                type: "message",
-                log: {
-                    message: `Get display for ${uuid}: ${data.message}`,
-                    log_level: 0,
-                },
-                data: {
-                    display: data.message,
-                }
-            })
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to get display for ${uuid}: ${data.message}`,
-                    log_level: 1,
-                },
-                data: {},
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to get display for ${uuid}: ${err.message}`,
-                log_level: 1,
-            },
-            data: {},
-        })
-    }
-});
+            let newUsername = req.body.username.toLowerCase().replace(/[^a-z0-9_]/g, '');
 
-app.get('/api/:uuid/avatar', async (req, res) => {
-    let uuid = req.params.uuid;
-
-    try {
-        let data = await db.get_avatar(uuid);
-        if (data.success) {
-            res.json({
-                type: "message",
-                log: {
-                    message: `Get avatar for ${uuid}: ${data.message}`,
-                    log_level: 0,
-                },
-                data: {
-                    avatar: data.message,
-                }
-            })
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to get avatar for ${uuid}: ${data.message}`,
-                    log_level: 1,
-                },
-                data: {},
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to get avatar for ${uuid}: ${err.message}`,
-                log_level: 1,
-            },
-            data: {},
-        })
-    }
-});
-
-app.get('/api/:uuid/public-key', async (req, res) => {
-    let uuid = req.params.uuid;
-
-    try {
-        let data = await db.get_public_key(uuid)
-        if (data.success) {
-            res.json({
-                type: "message",
-                log: {
-                    message: `Get public_key for ${uuid}: ${data.message}`,
-                    log_level: 0,
-                },
-                data: {
-                    public_key: data.message,
-                }
-            })
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to get public_key for ${uuid}: ${data.message}`,
-                    log_level: 1,
-                },
-                data: {},
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to get public_key for ${uuid}: ${err.message}`,
-                log_level: 1,
-            },
-            data: {},
-        })
-    }
-});
-
-app.get('/api/:uuid/private-key-hash', async (req, res) => {
-    let uuid = req.params.uuid;
-
-    if (req.headers.authorization && req.headers.privatekeyhash) {
-        let omikron_exists = await db.get_omikron_uuids(req.headers.authorization)
-
-        if (omikron_exists.success) {
-            try {
-                let data = await db.get_private_key_hash(uuid)
-                if (data.success) {
-                    res.json({
-                        type: "message",
-                        log: {
-                            message: `Get private_key_hash for ${uuid}: ${data.message}`,
-                            log_level: 0,
-                        },
-                        data: {
-                            matches: req.headers.privatekeyhash === data.message,
-                        }
-                    })
-                } else {
-                    res.status(500).json({
-                        type: "error",
-                        log: {
-                            message: `Failed to get private_key_hash for ${uuid}: ${data.message}`,
-                            log_level: 1,
-                        },
-                        data: {},
-                    })
-                }
-            } catch (err) {
-                res.status(500).json({
+            if (userCreations.includes(req.body.uuid)) {
+                db.add(
+                    req.body.uuid,
+                    req.body.public_key,
+                    req.body.private_key_hash,
+                    newUsername,
+                    reset_token,
+                    req.body.iota_id,
+                    Date.now(),
+                );
+                userCreations.shift(req.body.uuid);
+            } else {
+                res.status(400).json({
                     type: "error",
                     log: {
-                        message: `Failed to get private_key_hash for ${uuid}: ${err.message}`,
+                        message: "User creation failed do to invalid UUID",
+                        log_level: 1,
+                    }
+                });
+            }
+            // Success Message
+            res.json({
+                type: "success",
+                log: {
+                    message: `Created User: ${req.body.uuid}`,
+                    log_level: 0,
+                }
+            });
+        } else {
+            res.status(400).json({
+                type: "error",
+                log: {
+                    message: "User creation failed do to missing values",
+                    log_level: 1,
+                }
+            });
+        };
+    } catch (err) {
+        res.status(500).json({
+            type: "error",
+            log: {
+                message: err.message,
+                log_level: 1,
+            }
+        })
+    }
+});
+
+// Omikron Endpoints
+app.get('/api/get/private-key-hash/:uuid', async (req, res) => {
+    let uuid = req.params.uuid;
+    try {
+        if (req.headers.authorization && req.headers.privatekeyhash) {
+            let isLegitOmikron = await db.checkLegitimacy(req.headers.authorization)
+            if (isLegitOmikron) {
+                let { private_key_hash } = await db.get(uuid);
+                res.json({
+                    type: "success",
+                    log: {
+                        message: `Got private key hash for ${uuid}`,
                         log_level: 1,
                     },
-                    data: {},
+                    data: {
+                        matches: req.headers.privatekeyhash === private_key_hash,
+                    },
                 })
-            }
-        } else {
-            res.status(401).json({
-                type: "error",
-                log: {
-                    message: `Tried to access private_key_hash for ${uuid}: Permission Denied`,
-                    log_level: 1,
-                },
-                data: {},
-            })
-        }
-    } else {
-        res.status(401).json({
+            } else throw new Error("Permission Denied")
+        } else throw new Error("Permission Denied")
+    } catch (err) {
+        res.json({
             type: "error",
             log: {
-                message: `Tried to access private_key_hash for ${uuid}: Permission Denied`,
+                message: `Failed to get private key hash for ${uuid}: ${err.message}`,
                 log_level: 1,
-            },
-            data: {},
+            }
         })
     }
-})
+});
 
-app.get('/api/:uuid/iota-id', async (req, res) => {
+app.get('/api/get/iota-id/:uuid', async (req, res) => {
     let uuid = req.params.uuid;
-    if (req.headers.authorization) {
-        let omikron_exists = await db.get_omikron_uuids(req.headers.authorization)
-
-        if (omikron_exists.success) {
-            try {
-                let data = await db.get_iota_id(uuid)
-                if (data.success) {
-                    res.json({
-                        type: "message",
-                        log: {
-                            message: `Get iota_id for ${uuid}: ${data.message}`,
-                            log_level: 0,
-                        },
-                        data: {
-                            iota_id: data.message,
-                        }
-                    })
-                } else {
-                    res.status(500).json({
-                        type: "error",
-                        log: {
-                            message: `Failed to get iota_id for ${uuid}: ${data.message}`,
-                            log_level: 1,
-                        },
-                        data: {},
-                    })
-                }
-            } catch (err) {
-                res.status(500).json({
-                    type: "error",
+    try {
+        if (req.headers.authorization) {
+            let isLegitOmikron = await db.checkLegitimacy(req.headers.authorization)
+            if (isLegitOmikron) {
+                let { iota_id } = await db.get(uuid);
+                res.json({
+                    type: "success",
                     log: {
-                        message: `Failed to get iota_id for ${uuid}: ${err.message}`,
+                        message: `Got iota id for ${uuid}`,
                         log_level: 1,
                     },
-                    data: {},
+                    data: {
+                        iota_id,
+                    },
                 })
-            }
-        } else {
-            res.status(401).json({
-                type: "error",
-                log: {
-                    message: `Tried to access IOTA UUID for ${uuid}: Permission Denied`,
-                    log_level: 1,
-                },
-                data: {},
-            })
-        }
-    } else {
-        res.status(401).json({
+            } else throw new Error("Permission Denied")
+        } else throw new Error("Permission Denied")
+    } catch (err) {
+        res.json({
             type: "error",
             log: {
-                message: `Tried to access IOTA UUID for ${uuid}: Permission Denied`,
+                message: `Failed to get private key hash for ${uuid}: ${err.message}`,
                 log_level: 1,
-            },
-            data: {},
-        })
-    }
-});
-
-app.get('/api/:uuid/created-at', async (req, res) => {
-    let uuid = req.params.uuid;
-
-    try {
-        let data = await db.get_created_at(uuid)
-        if (data.success) {
-            res.json({
-                type: "message",
-                log: {
-                    message: `Get created_at for ${uuid}: ${data.message}`,
-                    log_level: 0,
-                },
-                data: {
-                    created_at: data.message,
-                }
-            })
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to get created_at for ${uuid}: ${data.message}`,
-                    log_level: 1,
-                },
-                data: {},
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to get created_at for ${uuid}: ${err.message}`,
-                log_level: 1,
-            },
-            data: {},
-        })
-    }
-});
-
-app.post('/api/:uuid/change_username', async (req, res) => {
-    let uuid = req.params.uuid;
-    try {
-        if ("private_key_hash" in req.body && "username" in req.body) {
-            let private_key_hash = await db.get_private_key_hash(uuid)
-            if (private_key_hash.success) {
-                if (req.body.private_key_hash === private_key_hash.message) {
-                    let data = await db.change_username(uuid, req.body.username)
-                    if (data.success) {
-                        res.json({
-                            type: "message",
-                            log: {
-                                message: `Changed username for ${uuid} to ${req.body.username}`,
-                                log_level: 0
-                            },
-                            data: {}
-                        })
-                    } else {
-                        res.status(500).json({
-                            type: "error",
-                            log: {
-                                message: `Failed to change username ${uuid}: ${data.message}`,
-                                log_level: 1
-                            },
-                            data: {}
-                        })
-                    }
-                } else {
-                    res.status(403).json({
-                        type: "error",
-                        log: {
-                            message: `Failed to change username ${uuid}: Permission Denied`,
-                            log_level: 1
-                        },
-                        data: {}
-                    })
-                }
-            } else {
-                res.status(500).json({
-                    type: "error",
-                    log: {
-                        message: `Failed to change username ${uuid}: ${private_key_hash.message}`,
-                        log_level: 1
-                    },
-                    data: {}
-                })
             }
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to change username ${uuid}: Missing Value`,
-                    log_level: 1
-                },
-                data: {}
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to change username ${uuid}: ${err.message}`,
-                log_level: 1
-            },
-            data: {}
-        })
-    }
-});
-
-app.post('/api/:uuid/change_display', async (req, res) => {
-    let uuid = req.params.uuid;
-    try {
-        if ("private_key_hash" in req.body && "display" in req.body) {
-            let private_key_hash = await db.get_private_key_hash(uuid)
-            if (private_key_hash.success) {
-                if (req.body.private_key_hash === private_key_hash.message) {
-                    let data = await db.change_display(uuid, req.body.display)
-                    if (data.success) {
-                        res.json({
-                            type: "message",
-                            log: {
-                                message: `Changed display for ${uuid} to ${req.body.display}`,
-                                log_level: 0
-                            },
-                            data: {}
-                        })
-                    } else {
-                        res.status(500).json({
-                            type: "error",
-                            log: {
-                                message: `Failed to change display ${uuid}: ${data.message}`,
-                                log_level: 1
-                            },
-                            data: {}
-                        })
-                    }
-                } else {
-                    res.status(403).json({
-                        type: "error",
-                        log: {
-                            message: `Failed to change display ${uuid}: Permission Denied`,
-                            log_level: 1
-                        },
-                        data: {}
-                    })
-                }
-            } else {
-                res.status(500).json({
-                    type: "error",
-                    log: {
-                        message: `Failed to change display ${uuid}: ${private_key_hash.message}`,
-                        log_level: 1
-                    },
-                    data: {}
-                })
-            }
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to change display ${uuid}: Missing Value`,
-                    log_level: 1
-                },
-                data: {}
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to change display ${uuid}: ${err.message}`,
-                log_level: 1
-            },
-            data: {}
-        })
-    }
-});
-
-app.post('/api/:uuid/change_avatar', async (req, res) => {
-    let uuid = req.params.uuid;
-    try {
-        if ("private_key_hash" in req.body && "avatar" in req.body) {
-            let private_key_hash = await db.get_private_key_hash(uuid)
-            if (private_key_hash.success) {
-                if (req.body.private_key_hash === private_key_hash.message) {
-                    let data = await db.change_avatar(uuid, req.body.avatar)
-                    if (data.success) {
-                        res.json({
-                            type: "message",
-                            log: {
-                                message: `Changed avatar for ${uuid} to ${req.body.avatar}`,
-                                log_level: 0
-                            },
-                            data: {}
-                        })
-                    } else {
-                        res.status(500).json({
-                            type: "error",
-                            log: {
-                                message: `Failed to change avatar ${uuid}: ${data.message}`,
-                                log_level: 1
-                            },
-                            data: {}
-                        })
-                    }
-                } else {
-                    res.status(403).json({
-                        type: "error",
-                        log: {
-                            message: `Failed to change avatar ${uuid}: Permission Denied`,
-                            log_level: 1
-                        },
-                        data: {}
-                    })
-                }
-            } else {
-                res.status(500).json({
-                    type: "error",
-                    log: {
-                        message: `Failed to change avatar ${uuid}: ${private_key_hash.message}`,
-                        log_level: 1
-                    },
-                    data: {}
-                })
-            }
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to change avatar ${uuid}: Missing Value`,
-                    log_level: 1
-                },
-                data: {}
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to change avatar ${uuid}: ${err.message}`,
-                log_level: 1
-            },
-            data: {}
-        })
-    }
-});
-
-app.post('/api/:uuid/change_about', async (req, res) => {
-    let uuid = req.params.uuid;
-    try {
-        if ("private_key_hash" in req.body && "about" in req.body) {
-            let private_key_hash = await db.get_private_key_hash(uuid)
-            if (private_key_hash.success) {
-                if (req.body.private_key_hash === private_key_hash.message) {
-                    let data = await db.change_about(uuid, req.body.about)
-                    if (data.success) {
-                        res.json({
-                            type: "message",
-                            log: {
-                                message: `Changed about for ${uuid} to ${req.body.about}`,
-                                log_level: 0
-                            },
-                            data: {}
-                        })
-                    } else {
-                        res.status(500).json({
-                            type: "error",
-                            log: {
-                                message: `Failed to change about ${uuid}: ${data.message}`,
-                                log_level: 1
-                            },
-                            data: {}
-                        })
-                    }
-                } else {
-                    res.status(403).json({
-                        type: "error",
-                        log: {
-                            message: `Failed to change about ${uuid}: Permission Denied`,
-                            log_level: 1
-                        },
-                        data: {}
-                    })
-                }
-            } else {
-                res.status(500).json({
-                    type: "error",
-                    log: {
-                        message: `Failed to change about ${uuid}: ${private_key_hash.message}`,
-                        log_level: 1
-                    },
-                    data: {}
-                })
-            }
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to change about ${uuid}: Missing Value`,
-                    log_level: 1
-                },
-                data: {}
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to change about ${uuid}: ${err.message}`,
-                log_level: 1
-            },
-            data: {}
-        })
-    }
-});
-
-app.post('/api/:uuid/change_status', async (req, res) => {
-    let uuid = req.params.uuid;
-    try {
-        if ("private_key_hash" in req.body && "status" in req.body) {
-            let private_key_hash = await db.get_private_key_hash(uuid)
-            if (private_key_hash.success) {
-                if (req.body.private_key_hash === private_key_hash.message) {
-                    let data = await db.change_status(uuid, req.body.status)
-                    if (data.success) {
-                        res.json({
-                            type: "message",
-                            log: {
-                                message: `Changed status for ${uuid} to ${req.body.status}`,
-                                log_level: 0
-                            },
-                            data: {}
-                        })
-                    } else {
-                        res.status(500).json({
-                            type: "error",
-                            log: {
-                                message: `Failed to change status ${uuid}: ${data.message}`,
-                                log_level: 1
-                            },
-                            data: {}
-                        })
-                    }
-                } else {
-                    res.status(403).json({
-                        type: "error",
-                        log: {
-                            message: `Failed to change status ${uuid}: Permission Denied`,
-                            log_level: 1
-                        },
-                        data: {}
-                    })
-                }
-            } else {
-                res.status(500).json({
-                    type: "error",
-                    log: {
-                        message: `Failed to change status ${uuid}: ${private_key_hash.message}`,
-                        log_level: 1
-                    },
-                    data: {}
-                })
-            }
-        } else {
-            res.status(500).json({
-                type: "error",
-                log: {
-                    message: `Failed to change status ${uuid}: Missing Value`,
-                    log_level: 1
-                },
-                data: {}
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: `Failed to change status ${uuid}: ${err.message}`,
-                log_level: 1
-            },
-            data: {}
         })
     }
 });
@@ -918,8 +456,8 @@ app.listen(port, async () => {
 });
 
 // Database Disconnect Cleanup
-process.on('SIGINT', db.close);
-process.on('SIGTERM', db.close);
+process.on('SIGINT', db.close());
+process.on('SIGTERM', db.close());
 process.on('uncaughtException', async (err) => {
     console.error('Uncaught Exception:', err);
     await db.close();
