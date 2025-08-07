@@ -256,8 +256,6 @@ app.post('/api/register/options/:uuid', async (req, res) => {
     try {
         let user = await db.get(uuid);
         if (req.body.private_key_hash === user.private_key_hash) {
-            let saltB64 = randomBytes(32).toString('base64')
-            user.salt = saltB64
             user.credentials = []
             let options = await generateRegistrationOptions({
                 rpName,
@@ -266,9 +264,10 @@ app.post('/api/register/options/:uuid', async (req, res) => {
                 userDisplayName: user.display,
                 attestationType: 'none',
                 authenticatorSelection: { userVerification: 'required' },
-                supportedAlgorithmIDs: [-7],            // ES256
-                extensions: { hmacCreateSecret: true }, // request hmac‐secret
+                supportedAlgorithmIDs: [-7],
             })
+
+            user.lambda = randomBytes(32).toString("base64")
             user.current_challenge = options.challenge
 
             await db.update(uuid, user)
@@ -280,8 +279,7 @@ app.post('/api/register/options/:uuid', async (req, res) => {
                     log_level: 2
                 },
                 data: {
-                    options,
-                    salt: saltB64
+                    options
                 }
             })
         } else throw new Error("Permission Denied")
@@ -300,12 +298,7 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
     let uuid = req.params.uuid;
 
     try {
-        if (!req.body) {
-            throw new Error('Missing request body');
-        }
-
         let user = await db.get(uuid);
-        if (!user) throw new Error('User not found');
 
         if (req.body.private_key_hash !== user.private_key_hash) {
             throw new Error('Permission Denied');
@@ -331,20 +324,11 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
             throw new Error('WebAuthn verification failed');
         }
 
-        if (!registrationInfo) {
-            throw new Error('No registrationInfo returned from verification');
-        }
-
         let { credential } = registrationInfo;
-        if (!credential) {
-            throw new Error('No credential data returned from verification');
-        }
 
         let { id: credentialID, publicKey: credentialPublicKey, counter } = credential;
         if (!credentialID || !credentialPublicKey) {
-            throw new Error(
-                `Missing credential data - credentialID: ${!!credentialID}, credentialPublicKey: ${!!credentialPublicKey}`
-            );
+            throw new Error("Missing credential data");
         }
 
         if (!Array.isArray(user.credentials)) user.credentials = [];
@@ -355,12 +339,20 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
             counter: counter || 0,
         });
 
+        let lambda = user.lambda
+
         user.current_challenge = "";
         await db.update(uuid, user);
 
         res.json({
             type: 'success',
-            log: { message: `Verified ${uuid}`, log_level: 2 },
+            log: { 
+                message: `Verified ${uuid}`, 
+                log_level: 2 
+            },
+            data: {
+                lambda
+            }
         });
     } catch (err) {
         res.json({
@@ -391,9 +383,6 @@ app.get('/api/login/options/:uuid', async (req, res) => {
             ],
             userVerification: 'required',
             rpID,
-            extensions: {
-                hmacGetSecret: true,
-            },
         })
         
         user.current_challenge = options.challenge;
@@ -406,7 +395,6 @@ app.get('/api/login/options/:uuid', async (req, res) => {
             },
             data: {
                 options,
-                salt: user.salt,
                 credential_id: cred.credID,
             }
         })
@@ -443,6 +431,7 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
             })
             let { verified, authenticationInfo } = verification;
             if (verified) {
+                let lambda = user.lambda
                 cred.counter = authenticationInfo.newCounter
                 user.current_challenge = "";
                 await db.update(uuid, user)
@@ -451,6 +440,9 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
                     log: {
                         message: `Verified ${uuid}`,
                         log_level: 2
+                    },
+                    data: {
+                        lambda
                     }
                 })
             } else throw new Error("Verification Failed")
