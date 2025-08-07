@@ -201,8 +201,6 @@ export async function update(uuid, data) {
 
     connection = await pool.getConnection();
 
-    console.log("2", [...values, uuid]);
-
     let [result] = await connection.execute(
       "UPDATE users SET " + setExpr + " WHERE `uuid` = ?",
       [...values, uuid]
