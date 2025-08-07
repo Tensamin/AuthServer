@@ -382,9 +382,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
         if (!user?.credentials?.length) {
             throw new Error("No credentials registered for this user");
         }
-        console.log(user.salt)
-        console.log(Buffer.from(user.salt, "base64"))
-        console.log(cred.credID)
+        console.log(cred)
         let options = await generateAuthenticationOptions({
             allowCredentials: [
                 {
