@@ -299,48 +299,70 @@ app.post('/api/register/options/:uuid', async (req, res) => {
 });
 
 app.post('/api/register/verify/:uuid', async (req, res) => {
-  let uuid = req.params.uuid;
+  const uuid = req.params.uuid;
 
   try {
-    let user = await db.get(uuid);
-    if (req.body.private_key_hash === user.private_key_hash) {
-      let verification = await verifyRegistrationResponse({
-        response: req.body.attestation,
-        expectedChallenge: user.current_challenge,
-        expectedOrigin: origin,
-        expectedRPID: rpID,
-        requireUserVerification: true,
-      })
-      let { verified, registrationInfo } = verification;
-      if (verified && registrationInfo) {
-        let {
-          credentialID,
-          credentialPublicKey,
-          counter,
-        } = registrationInfo;
-        user.credentials.push({
-          credID: base64url(credentialID),
-          publicKey: base64url(credentialPublicKey),
-          counter,
-        })
-        await db.update(uuid, user);
-        res.json({
-          type: "success",
-          log: {
-            message: `Verified ${uuid}`,
-            log_level: 2
-          }
-        })
-      } else throw new Error("Verification Failed")
-    } else throw new Error("Permission Denied")
-  } catch (err) {
+    if (!req.body) {
+      throw new Error('Missing request body');
+    }
+
+    const user = await db.get(uuid);
+    if (!user) throw new Error('User not found');
+
+    if (req.body.private_key_hash !== user.private_key_hash) {
+      throw new Error('Permission Denied');
+    }
+
+    if (!user.current_challenge) {
+      throw new Error('Stored challenge missing for user');
+    }
+    if (!req.body.attestation) {
+      throw new Error('Missing attestation in request body');
+    }
+
+    const verification = await verifyRegistrationResponse({
+      response: req.body.attestation,
+      expectedChallenge: user.current_challenge,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
+      requireUserVerification: true,
+    });
+
+    const { verified, registrationInfo } = verification || {};
+    if (!verified || !registrationInfo) {
+      throw new Error('Verification Failed or missing registrationInfo');
+    }
+
+    const { credentialID, credentialPublicKey, counter } = registrationInfo;
+    if (credentialID == null || credentialPublicKey == null) {
+      throw new Error(
+        'registrationInfo missing credentialID or credentialPublicKey',
+      );
+    }
+
+    if (!Array.isArray(user.credentials)) user.credentials = [];
+
+    user.credentials.push({
+      credID: base64url(credentialID),
+      publicKey: base64url(credentialPublicKey),
+      counter,
+    });
+
+    await db.update(uuid, user);
+
     res.json({
-      type: "error",
+      type: 'success',
+      log: { message: `Verified ${uuid}`, log_level: 2 },
+    });
+  } catch (err) {
+    console.error('register/verify error:', err);
+    res.json({
+      type: 'error',
       log: {
         message: `Failed to verify ${uuid}: ${err.message}`,
-        log_level: 2
-      }
-    })
+        log_level: 2,
+      },
+    });
   }
 });
 
