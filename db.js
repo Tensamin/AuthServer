@@ -4,6 +4,35 @@ import * as schedule from "node-schedule"
 
 let pool;
 
+// Helper Functions
+function isValidColName(name) {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+}
+
+function prepareUpdateEntries(data) {
+  if (!data || typeof data !== 'object') {
+    throw new TypeError('data must be a non-null object');
+  }
+
+  let entries = Object.entries(data).filter(([, v]) => v !== undefined);
+  if (entries.length === 0) return { setExpr: '', values: [] };
+
+  for (let [k] of entries) {
+    if (!isValidColName(k)) {
+      throw new Error(
+        `Invalid column name: "${k}". Allowed: [A-Za-z_][A-Za-z0-9_]*`
+      );
+    }
+  }
+
+  let setExpr = entries.map(([k]) => `\`${k}\` = ?`).join(', ');
+  let values = entries.map(([, v]) =>
+    v === null ? null : typeof v === 'object' ? JSON.stringify(v) : v
+  );
+
+  return { setExpr, values };
+}
+
 export async function init() {
   if (pool) {
     console.log('Database pool already initialized.');
@@ -143,10 +172,9 @@ export async function get(uuid) {
       'SELECT * FROM users WHERE uuid = ?',
       [uuid]
     );
-
-    if (rows.length === 0) return null;
-    return rows[0];
+    return rows[0] ?? null;
   } catch (err) {
+    console.error('get() DB error', err);
     throw err;
   } finally {
     if (connection) connection.release();
@@ -156,21 +184,29 @@ export async function get(uuid) {
 export async function update(uuid, data) {
   let connection;
   try {
+    let { setExpr, values } = prepareUpdateEntries(data);
+    if (!setExpr) return false;
+
+    let placeholderCount = (setExpr.match(/\?/g) || []).length;
+    if (placeholderCount !== values.length) {
+      throw new Error(
+        `Placeholder/value mismatch: ${placeholderCount} placeholders ` +
+        `but ${values.length} values`
+      );
+    }
+
     connection = await pool.getConnection();
 
-    let keys = Object.keys(data);
-    if (keys.length === 0) return false;
-
-    let setClause = keys.map((key) => `${key} = ?`).join(', ');
-    let values = Object.values(data);
+    console.log('SQL:', `UPDATE users SET ${setExpr} WHERE uuid = ?`);
+    console.log('VALUES:', [...values, uuid]);
 
     let [result] = await connection.execute(
-      `UPDATE users SET ${setClause} WHERE uuid = ?`,
+      `UPDATE users SET ${setExpr} WHERE uuid = ?`,
       [...values, uuid]
     );
-
     return result.affectedRows > 0;
   } catch (err) {
+    console.error('update() DB error', { err, data });
     throw err;
   } finally {
     if (connection) connection.release();
