@@ -385,7 +385,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
         let options = await generateAuthenticationOptions({
             allowCredentials: [
                 {
-                    id: cred.credID,
+                    id: Buffer.from(cred.credID, "base64"),
                     transports: ['usb', 'ble', 'nfc', 'internal']
                 }
             ],
