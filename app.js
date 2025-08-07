@@ -342,6 +342,9 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
             throw new Error('No credential data returned from verification');
         }
 
+        console.log("Registration Info:", registrationInfo);
+        console.log("Credential:", credential);
+
         let { id: credentialID, publicKey: credentialPublicKey, counter } = credential;
         if (!credentialID || !credentialPublicKey) {
             throw new Error(
