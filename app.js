@@ -343,7 +343,13 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
             throw new Error('No registrationInfo returned from verification');
         }
 
-        let { credentialID, credentialPublicKey, counter } = registrationInfo;
+        // The credential data is nested under registrationInfo.credential
+        let { credential } = registrationInfo;
+        if (!credential) {
+            throw new Error('No credential data returned from verification');
+        }
+
+        let { id: credentialID, publicKey: credentialPublicKey, counter } = credential;
         if (!credentialID || !credentialPublicKey) {
             throw new Error(
                 `Missing credential data - credentialID: ${!!credentialID}, credentialPublicKey: ${!!credentialPublicKey}`
@@ -352,9 +358,10 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
 
         if (!Array.isArray(user.credentials)) user.credentials = [];
 
+        // Convert the credential ID and public key to base64url
         user.credentials.push({
-            credID: base64url(credentialID),
-            publicKey: base64url(credentialPublicKey),
+            credID: base64url(Buffer.from(credentialID)),
+            publicKey: base64url(Buffer.from(credentialPublicKey)),
             counter: counter || 0,
         });
 
