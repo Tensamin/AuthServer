@@ -261,7 +261,7 @@ app.post('/api/register/options/:uuid', async (req, res) => {
       let saltB64 = base64url(salt)
       user.salt = saltB64
       user.credentials = []
-      let options = generateRegistrationOptions({
+      let options = await generateRegistrationOptions({
         rpName,
         rpID,
         userName: user.username,
@@ -271,6 +271,7 @@ app.post('/api/register/options/:uuid', async (req, res) => {
         supportedAlgorithmIDs: [-7],            // ES256
         extensions: { hmacCreateSecret: true }, // request hmac‐secret
       })
+      console.log(options.challenge)
       user.current_challenge = options.challenge
 
       await db.update(uuid, user)
