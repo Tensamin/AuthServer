@@ -7,7 +7,6 @@ import * as db from "./db.js";
 import "dotenv/config";
 
 import { randomBytes } from 'crypto'
-import base64url from 'base64url'
 import {
     generateRegistrationOptions,
     verifyRegistrationResponse,
@@ -257,8 +256,7 @@ app.post('/api/register/options/:uuid', async (req, res) => {
     try {
         let user = await db.get(uuid);
         if (req.body.private_key_hash === user.private_key_hash) {
-            let salt = randomBytes(32)
-            let saltB64 = base64url(salt)
+            let saltB64 = randomBytes(32).toString('base64')
             user.salt = saltB64
             user.credentials = []
             let options = await generateRegistrationOptions({
@@ -342,9 +340,6 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
             throw new Error('No credential data returned from verification');
         }
 
-        console.log("Registration Info:", registrationInfo);
-        console.log("Credential:", credential);
-
         let { id: credentialID, publicKey: credentialPublicKey, counter } = credential;
         if (!credentialID || !credentialPublicKey) {
             throw new Error(
@@ -355,8 +350,8 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
         if (!Array.isArray(user.credentials)) user.credentials = [];
 
         user.credentials.push({
-            credID: base64url(Buffer.from(credentialID)),
-            publicKey: base64url(Buffer.from(credentialPublicKey)),
+            credID: credentialID,
+            publicKey: Buffer.from(credentialPublicKey).toString('base64'),
             counter: counter || 0,
         });
 
@@ -387,7 +382,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
         let options = await generateAuthenticationOptions({
             allowCredentials: [
                 {
-                    id: base64url.toBuffer(cred.credID),
+                    id: cred.credID,
                     type: 'public-key',
                     transports: ['usb', 'ble', 'nfc', 'internal']
                 }
@@ -396,7 +391,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
             rpID,
         })
         options.extensions = {
-            hmacGetSecret: { salt1: base64url.toBuffer(user.salt) },
+            hmacGetSecret: { salt1: Buffer.from(user.salt, "base64") },
         }
         user.current_challenge = options.challenge;
         await db.update(uuid, user);
@@ -436,8 +431,8 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
                 expectedOrigin: origin,
                 expectedRPID: rpID,
                 authenticator: {
-                    publicKey: base64url.toBuffer(cred.publicKey),
-                    credentialID: base64url.toBuffer(cred.credID),
+                    publicKey: Buffer.from(cred.publicKey, "base64"),
+                    credentialID: Buffer.from(cred.credID, "base64"),
                     counter: cred.counter,
                 },
                 requireUserVerification: true,
