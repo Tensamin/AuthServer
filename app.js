@@ -366,7 +366,7 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
         });
 
         // Clear the challenge after successful verification
-        user.current_challenge = null;
+        user.current_challenge = "";
         await db.update(uuid, user);
 
         res.json({
