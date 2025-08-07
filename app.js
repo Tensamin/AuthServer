@@ -391,6 +391,9 @@ app.get('/api/login/options/:uuid', async (req, res) => {
             ],
             userVerification: 'required',
             rpID,
+            extensions: {
+                hmacGetSecret: true,
+            },
         })
         options.extensions = {
             hmacGetSecret: { salt1: Buffer.from(user.salt, "base64") },
