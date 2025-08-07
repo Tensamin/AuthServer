@@ -382,10 +382,11 @@ app.get('/api/login/options/:uuid', async (req, res) => {
         if (!user?.credentials?.length) {
             throw new Error("No credentials registered for this user");
         }
+
         let options = await generateAuthenticationOptions({
             allowCredentials: [
                 {
-                    id: cred.credID,
+                    id: Buffer.from(cred.credID, "base64"),
                     transports: ['usb', 'ble', 'nfc', 'internal']
                 }
             ],
@@ -394,12 +395,11 @@ app.get('/api/login/options/:uuid', async (req, res) => {
             extensions: {
                 hmacGetSecret: true,
             },
-        })
-        options.extensions = {
-            hmacGetSecret: { salt1: Buffer.from(user.salt, "base64") },
-        }
+        });
+
         user.current_challenge = options.challenge;
         await db.update(uuid, user);
+
         res.json({
             type: "success",
             log: {
@@ -411,7 +411,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
                 salt: user.salt,
                 credential_id: cred.credID,
             }
-        })
+        });
     } catch (err) {
         res.json({
             type: "error",
@@ -419,7 +419,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
                 message: `Failed to get login options for ${uuid}: ${err.message}`,
                 log_level: 2
             }
-        })
+        });
     }
 });
 
