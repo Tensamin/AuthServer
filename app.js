@@ -116,7 +116,7 @@ app.post('/api/change/username/:uuid', async (req, res) => {
         if ("private_key_hash" in req.body && "username" in req.body) {
             let user = await db.get(uuid);
             if (req.body.private_key_hash === user.private_key_hash) {
-                user.username = req.body.username;
+                user.username = req.body.username.toLowerCase().replace(/[^a-z0-9_]/g, "");
                 await db.update(uuid, user);
                 res.json({
                     type: "success",
@@ -172,7 +172,7 @@ app.post('/api/change/avatar/:uuid', async (req, res) => {
         if ("private_key_hash" in req.body && "avatar" in req.body) {
             let user = await db.get(uuid);
             if (req.body.private_key_hash === user.private_key_hash) {
-                user.avatar = adjustAvatar(req.body.avatar, user.sub_level >= 1);
+                user.avatar = await adjustAvatar(req.body.avatar, user.sub_level >= 1);
                 await db.update(uuid, user);
                 res.json({
                     type: "success",
@@ -379,6 +379,9 @@ app.get('/api/login/options/:uuid', async (req, res) => {
     try {
         let user = await db.get(uuid);
         let cred = user.credentials[0];
+        if (!user?.credentials?.length) {
+            throw new Error("No credentials registered for this user");
+        }
         let options = await generateAuthenticationOptions({
             allowCredentials: [
                 {
@@ -425,6 +428,7 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
         if (req.body.assertion) {
             let user = await db.get(uuid)
             let cred = user.credentials[0];
+            console.log("CRED CREDID", cred.credID)
             let verification = await verifyAuthenticationResponse({
                 response: req.body.assertion,
                 expectedChallenge: user.current_challenge,
@@ -440,6 +444,7 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
             let { verified, authenticationInfo } = verification;
             if (verified) {
                 cred.counter = authenticationInfo.newCounter
+                user.current_challenge = "";
                 await db.update(uuid, user)
                 res.json({
                     type: "success",
