@@ -137,242 +137,39 @@ export async function uuid(username) {
 
 export async function get(uuid) {
   let connection;
-
   try {
-    if (!uuid || typeof uuid !== "string") {
-      throw new Error("uuid is required.");
-    }
-
     connection = await pool.getConnection();
-
-    const [rows, fields] = await connection.execute(
-      `SELECT * FROM users WHERE uuid = ?;`,
+    let [rows] = await connection.execute(
+      'SELECT * FROM users WHERE uuid = ?',
       [uuid]
     );
 
-    if (!Array.isArray(rows) || rows.length === 0) {
-      throw new Error("UUID not found.");
-    }
-
-    const row = rows[0];
-
-    const MYSQL_TYPE = {
-      DECIMAL: 0,
-      TINY: 1,
-      SHORT: 2,
-      LONG: 3,
-      FLOAT: 4,
-      DOUBLE: 5,
-      NULL: 6,
-      TIMESTAMP: 7,
-      LONGLONG: 8,
-      INT24: 9,
-      DATE: 10,
-      TIME: 11,
-      DATETIME: 12,
-      YEAR: 13,
-      NEWDATE: 14,
-      VARCHAR: 15,
-      BIT: 16,
-      JSON: 245,
-      NEWDECIMAL: 246,
-      ENUM: 247,
-      SET: 248,
-      TINY_BLOB: 249,
-      MEDIUM_BLOB: 250,
-      LONG_BLOB: 251,
-      BLOB: 252,
-      VAR_STRING: 253,
-      STRING: 254,
-      GEOMETRY: 255
-    };
-
-    const parseBitBuffer = (buf) => {
-      let n = 0;
-      for (let i = 0; i < buf.length; i++) {
-        n = (n << 8) + buf[i];
-      }
-      return n;
-    };
-
-    const normalizeValue = (val, field) => {
-      if (val === null) return null;
-
-      const ct = field.columnType;
-      const len = field.columnLength || field.length || null;
-
-      if (ct === MYSQL_TYPE.JSON) {
-        if (Buffer.isBuffer(val)) {
-          try {
-            return JSON.parse(val.toString("utf8"));
-          } catch (e) {
-            return val.toString("utf8");
-          }
-        }
-        if (typeof val === "string") {
-          try {
-            return JSON.parse(val);
-          } catch (e) {
-            return val;
-          }
-        }
-        return val;
-      }
-
-      if (ct === MYSQL_TYPE.BIT) {
-        if (Buffer.isBuffer(val)) {
-          const n = parseBitBuffer(val);
-          return val.length === 1 ? Boolean(n) : n;
-        }
-        if (typeof val === "number") {
-          return val === 1 ? true : val === 0 ? false : val;
-        }
-        if (typeof val === "string") {
-          if (val === "0") return false;
-          if (val === "1") return true;
-          const n = Number(val);
-          return Number.isNaN(n) ? val : n;
-        }
-        return val;
-      }
-
-      if (ct === MYSQL_TYPE.TINY) {
-        if (len === 1) {
-          if (typeof val === "number") return Boolean(val);
-          if (typeof val === "string") return val === "1";
-          if (Buffer.isBuffer(val)) return val[0] === 1;
-        }
-        if (typeof val === "string" && /^-?\d+$/.test(val)) {
-          const n = Number(val);
-          return Number.isSafeInteger(n) ? n : val;
-        }
-        return val;
-      }
-
-      if (
-        [MYSQL_TYPE.SHORT, MYSQL_TYPE.LONG, MYSQL_TYPE.LONGLONG,
-         MYSQL_TYPE.INT24].includes(ct)
-      ) {
-        if (typeof val === "string" && /^-?\d+$/.test(val)) {
-          const n = Number(val);
-          return Number.isSafeInteger(n) ? n : val;
-        }
-        if (Buffer.isBuffer(val)) {
-          return parseBitBuffer(val);
-        }
-        return val;
-      }
-
-      if ([MYSQL_TYPE.DECIMAL, MYSQL_TYPE.NEWDECIMAL].includes(ct)) {
-        if (typeof val === "string") {
-          const n = Number(val);
-          return Number.isFinite(n) ? n : val;
-        }
-        return val;
-      }
-
-      if (
-        [MYSQL_TYPE.TIMESTAMP, MYSQL_TYPE.DATE, MYSQL_TYPE.TIME,
-         MYSQL_TYPE.DATETIME, MYSQL_TYPE.YEAR, MYSQL_TYPE.NEWDATE]
-         .includes(ct)
-      ) {
-        if (val instanceof Date) return val.toISOString();
-        if (typeof val === "string") {
-          const d = new Date(val);
-          if (!Number.isNaN(d.getTime())) return d.toISOString();
-          return val;
-        }
-        return val;
-      }
-
-      return val;
-    };
-
-    const normalized = {};
-    for (const f of fields) {
-      const name = f.name || f.orgName;
-      normalized[name] = normalizeValue(row[name], f);
-    }
-
-    return normalized;
+    if (rows.length === 0) return null;
+    return rows[0];
   } catch (err) {
-    throw new Error(err.message);
+    throw err;
   } finally {
     if (connection) connection.release();
   }
-};
+}
 
-export async function update(uuid, user) {
+export async function update(uuid, data) {
   let connection;
-
   try {
-    if (!uuid || typeof uuid !== 'string') {
-      throw new Error('uuid is required.');
-    }
-
-    let ALLOWED_USER_FIELDS = new Set([
-      'uuid',
-      'public_key',
-      'private_key_hash',
-      'iota_id',
-      'token',
-      'username',
-      'created_at',
-      'display',
-      'avatar',
-      'status',
-      'sub_level',
-      'sub_end',
-      'salt',
-      'current_challenge',
-      'credentials'
-    ]);
-
-    let fields = Object.keys(user || {}).filter(
-      (k) =>
-        k !== 'uuid' &&
-        user[k] !== undefined &&
-        ALLOWED_USER_FIELDS.has(k)
-    );
-
-    if (fields.length === 0) {
-      return 'Nothing to update.';
-    }
-
-    let serializeParam = (v) => {
-      if (v === undefined || v === null) return null;
-      if (typeof v === 'bigint') return v.toString();
-      if (typeof v === 'boolean') return v ? 1 : 0;
-      if (Buffer.isBuffer(v)) return v;
-      if (v instanceof Date) return v;
-      if (typeof v === 'object') return JSON.stringify(v);
-      return v;
-    };
-
-    let placeholders = fields.map((k) => `\`${k}\` = ?`).join(', ');
-    let values = fields.map((k) => serializeParam(user[k]));
-
     connection = await pool.getConnection();
 
-    let [existsRows] = await connection.execute(
-      'SELECT 1 FROM `users` WHERE `uuid` = ? LIMIT 1',
-      [serializeParam(uuid)]
-    );
+    let keys = Object.keys(data);
+    if (keys.length === 0) return false;
 
-    if (!Array.isArray(existsRows) || existsRows.length === 0) {
-      throw new Error('UUID not found.');
-    }
+    let setClause = keys.map((key) => `${key} = ?`).join(', ');
+    let values = Object.values(data);
 
     let [result] = await connection.execute(
-      `UPDATE \`users\` SET ${placeholders} WHERE \`uuid\` = ?`,
-      [...values, serializeParam(uuid)]
+      `UPDATE users SET ${setClause} WHERE uuid = ?`,
+      [...values, uuid]
     );
 
-    if (result.changedRows === 0) {
-      return 'No changes.';
-    }
-
-    return 'User updated.';
+    return result.affectedRows > 0;
   } catch (err) {
     throw err;
   } finally {
