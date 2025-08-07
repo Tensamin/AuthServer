@@ -320,10 +320,6 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
             throw new Error('Missing attestation in request body');
         }
 
-        // Add more detailed logging to debug the issue
-        console.log('Attestation object:', JSON.stringify(req.body.attestation, null, 2));
-        console.log('Expected challenge:', user.current_challenge);
-
         let verification = await verifyRegistrationResponse({
             response: req.body.attestation,
             expectedChallenge: user.current_challenge,
@@ -331,8 +327,6 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
             expectedRPID: rpID,
             requireUserVerification: true,
         });
-
-        console.log('Verification result:', JSON.stringify(verification, null, 2));
 
         let { verified, registrationInfo } = verification || {};
         if (!verified) {
@@ -343,7 +337,6 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
             throw new Error('No registrationInfo returned from verification');
         }
 
-        // The credential data is nested under registrationInfo.credential
         let { credential } = registrationInfo;
         if (!credential) {
             throw new Error('No credential data returned from verification');
@@ -358,14 +351,12 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
 
         if (!Array.isArray(user.credentials)) user.credentials = [];
 
-        // Convert the credential ID and public key to base64url
         user.credentials.push({
             credID: base64url(Buffer.from(credentialID)),
             publicKey: base64url(Buffer.from(credentialPublicKey)),
             counter: counter || 0,
         });
 
-        // Clear the challenge after successful verification
         user.current_challenge = "";
         await db.update(uuid, user);
 
@@ -374,7 +365,6 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
             log: { message: `Verified ${uuid}`, log_level: 2 },
         });
     } catch (err) {
-        console.error('register/verify error:', err);
         res.json({
             type: 'error',
             log: {
