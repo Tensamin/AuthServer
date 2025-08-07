@@ -21,7 +21,7 @@ let app = express();
 let userCreations = [];
 let rpID = 'tensamin';
 let rpName = 'Tensamin';
-let origin = "https://tensamin.methanium.net";
+let origin = "https://ma-at-home.hackrland.dev";
 
 // Environment
 app.use(cors({ origin: origin, credentials: true }));
