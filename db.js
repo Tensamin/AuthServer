@@ -182,9 +182,10 @@ export async function get(uuid) {
 
 export async function update(uuid, data) {
   let connection;
-  console.log(data)
   try {
     let { setExpr, values } = prepareUpdateEntries(data);
+    console.log(setExpr)
+    console.log(values)
     if (!setExpr) return false;
 
     let placeholderCount = (setExpr.match(/\?/g) || []).length;
