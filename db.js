@@ -155,28 +155,62 @@ export async function get(uuid) {
 };
 
 export async function update(uuid, user) {
+  let connection;
+
   try {
-    let connection = await pool.getConnection();
-    let fields = Object.keys(user).filter((k) => k !== "uuid");
-    let placeholders = fields.map((k) => `${k} = ?`).join(", ");
+    if (!uuid || typeof uuid !== "string") {
+      throw new Error("uuid is required.");
+    }
+
+    let ALLOWED_USER_FIELDS = new Set([
+      "email",
+      "name",
+      "first_name",
+      "last_name",
+      "phone",
+      "avatar_url",
+      "role",
+    ]);
+
+    let fields = Object.keys(user || {}).filter(
+      (k) => k !== "uuid" && user[k] !== undefined && ALLOWED_USER_FIELDS.has(k)
+    );
+
+    if (fields.length === 0) {
+      return "Nothing to update.";
+    }
+
+    let placeholders = fields
+      .map((k) => `\`${k.replace(/`/g, "``")}\` = ?`)
+      .join(", ");
     let values = fields.map((k) => user[k]);
-    values.push(uuid);
+
+    connection = await pool.getConnection();
+
+    let [existsRows] = await connection.execute(
+      "SELECT 1 FROM `users` WHERE `uuid` = ? LIMIT 1",
+      [uuid]
+    );
+    if (!Array.isArray(existsRows) || existsRows.length === 0) {
+      throw new Error("UUID not found.");
+    }
 
     let [result] = await connection.execute(
-      `UPDATE users SET ${placeholders} WHERE uuid = ?;`,
-      values
+      `UPDATE \`users\` SET ${placeholders} WHERE \`uuid\` = ?`,
+      [...values, uuid]
     );
-    connection.release();
 
-    if (result.affectedRows === 0) {
-      throw new Error('UUID not found.')
+    if (result.changedRows === 0) {
+      return "No changes.";
     }
 
     return "User updated.";
   } catch (err) {
-    throw new Error(err.message);
+    throw err;
+  } finally {
+    if (connection) connection.release();
   }
-};
+}
 
 export async function checkLegitimacy(uuid) {
   try {

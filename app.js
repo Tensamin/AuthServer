@@ -271,7 +271,6 @@ app.post('/api/register/options/:uuid', async (req, res) => {
         supportedAlgorithmIDs: [-7],            // ES256
         extensions: { hmacCreateSecret: true }, // request hmac‐secret
       })
-      console.log(options.challenge)
       user.current_challenge = options.challenge
 
       await db.update(uuid, user)
