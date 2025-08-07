@@ -382,6 +382,9 @@ app.get('/api/login/options/:uuid', async (req, res) => {
         if (!user?.credentials?.length) {
             throw new Error("No credentials registered for this user");
         }
+        console.log(user.salt)
+        console.log(Buffer.from(user.salt, "base64"))
+        console.log(cred.credID)
         let options = await generateAuthenticationOptions({
             allowCredentials: [
                 {
@@ -392,8 +395,6 @@ app.get('/api/login/options/:uuid', async (req, res) => {
             userVerification: 'required',
             rpID,
         })
-        console.log(user.salt)
-        console.log(Buffer.from(user.salt, "base64"))
         options.extensions = {
             hmacGetSecret: { salt1: Buffer.from(user.salt, "base64") },
         }
