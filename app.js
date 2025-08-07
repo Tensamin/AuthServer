@@ -116,7 +116,7 @@ app.post('/api/change/username/:uuid', async (req, res) => {
         if ("private_key_hash" in req.body && "username" in req.body) {
             let user = await db.get(uuid);
             if (req.body.private_key_hash === user.private_key_hash) {
-                user.username = req.body.username.toLowerCase().replace(/[^a-z0-9_]/g, "");
+                user.username = req.body.username.toLowerCase().replaceAll(/[^a-z0-9_]/g, "");
                 await db.update(uuid, user);
                 res.json({
                     type: "success",
@@ -564,7 +564,7 @@ app.post('/api/register/complete', async (req, res) => {
             let tokenPart3 = v7();
             let reset_token = `${tokenPart1}.${tokenPart2}.${tokenPart3}`;
 
-            let newUsername = req.body.username.toLowerCase().replace(/[^a-z0-9_]/g, '');
+            let newUsername = req.body.username.toLowerCase().replaceAll(/[^a-z0-9_]/g, '');
 
             if (userCreations.includes(req.body.uuid)) {
                 db.add(
