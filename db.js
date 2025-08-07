@@ -205,7 +205,7 @@ export async function update(uuid, data) {
     console.log("2", values);
 
     let [result] = await connection.execute(
-      "UPDATE users SET " + setExpr + "WHERE `uuid` = ?",
+      "UPDATE users SET " + setExpr + " WHERE `uuid` = ?",
       [...values, uuid]
     );
     return result.affectedRows > 0;
