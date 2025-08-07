@@ -172,7 +172,12 @@ export async function get(uuid) {
       'SELECT * FROM users WHERE uuid = ?',
       [uuid]
     );
-    return rows[0] ?? null;
+
+    let row = rows?.[0] ?? null;
+    if (!row) return null;
+
+    delete row.uuid;
+    return row;
   } catch (err) {
     throw err;
   } finally {
@@ -196,11 +201,11 @@ export async function update(uuid, data) {
 
     connection = await pool.getConnection();
 
-    console.log("1", `UPDATE users SET ${setExpr} WHERE uuid = ?`);
+    console.log("1", "UPDATE users SET " + setExpr + "WHERE `uuid` = ?");
     console.log("2", values);
 
     let [result] = await connection.execute(
-      `UPDATE users SET ${setExpr} WHERE uuid = ?`,
+      "UPDATE users SET " + setExpr + "WHERE `uuid` = ?",
       [...values, uuid]
     );
     return result.affectedRows > 0;
