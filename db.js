@@ -163,13 +163,21 @@ export async function update(uuid, user) {
     }
 
     let ALLOWED_USER_FIELDS = new Set([
-      "email",
-      "name",
-      "first_name",
-      "last_name",
-      "phone",
-      "avatar_url",
-      "role",
+      "uuid",
+      "public_key",
+      "private_key_hash",
+      "iota_id",
+      "token",
+      "username",
+      "created_at",
+      "display",
+      "avatar",
+      "status",
+      "sub_level",
+      "sub_end",
+      "salt",
+      "current_challenge",
+      "credentials"
     ]);
 
     let fields = Object.keys(user || {}).filter(
