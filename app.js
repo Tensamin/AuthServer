@@ -462,9 +462,9 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
       expectedChallenge: user.current_challenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
-      authenticator: {
+      credential: {
         publicKey: base64ToUint8Array(publicKey),
-        credentialID: id,
+        id,
         counter,
         transports: JSON.parse(transports),
       },
