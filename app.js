@@ -477,7 +477,7 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
 
     let lambda = user.lambda;
 
-    cred.counter = authenticationInfo.newCounter || cred.counter || 0;
+    console.log(authenticationInfo.newCounter);
 
     user.current_challenge = '';
     await db.update(uuid, user);
