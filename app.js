@@ -335,12 +335,12 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
       requireUserVerification: true,
     });
 
-    let { verified, registrationInfo } = verification || {};
+    let { verified, registrationInfo } = verification;
     if (!verified) {
       throw new Error('WebAuthn verification failed');
     }
 
-    let { credential } = registrationInfo || {};
+    let { credential } = registrationInfo;
     console.log("RegisterInfo", registrationInfo)
     console.log("Register", credential)
     let {
@@ -354,18 +354,16 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
       throw new Error('Missing credential data');
     }
 
-    if (!Array.isArray(JSON.parse(user.credentials))) {
-        user.credentials = []
-    } else {
-        user.credentials = JSON.parse(user.credentials)
-    };
+    let cred_id = v7();
 
-    user.credentials.push({
+    user.credentials = JSON.parse(user.credentials)
+
+    user.credentials[cred_id] = {
       id,
       publicKey: Buffer.from(publicKey).toString('base64'),
-      counter: counter,
+      counter,
       transports: JSON.stringify(transports),
-    });
+    };
 
     let lambda = user.lambda;
 
@@ -376,11 +374,12 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
       type: 'success',
       log: {
         message: `Verified ${uuid}`,
-        log_level: 2,
+        log_level: 2
       },
       data: {
         lambda,
-      },
+        cred_id
+      }
     });
   } catch (err) {
     res.json({
@@ -393,12 +392,15 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
   }
 });
 
-app.get('/api/login/options/:uuid', async (req, res) => {
+app.get('/api/login/options/:uuid/:id', async (req, res) => {
     let uuid = req.params.uuid;
+    let cred_id = req.params.id;
 
     try {
         let user = await db.get(uuid);
-        let cred = JSON.parse(user.credentials)[0];
+        user.credentials = JSON.parse(user.credentials)
+        if (user.credentials === undefined) throw new Error("Credential does not exist")
+        let cred = user.credentials[cred_id];
 
         let options = await generateAuthenticationOptions({
             allowCredentials: [
@@ -434,8 +436,9 @@ app.get('/api/login/options/:uuid', async (req, res) => {
     }
 });
 
-app.post('/api/login/verify/:uuid', async (req, res) => {
+app.post('/api/login/verify/:uuid/:id', async (req, res) => {
   let uuid = req.params.uuid;
+  let cred_id = req.params.id;
 
   try {
     let user = await db.get(uuid);
@@ -448,11 +451,11 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
       throw new Error('Missing attestation in request body');
     }
 
-    let cred = JSON.parse(user.credentials)[0];
+    user.credentials = JSON.parse(user.credentials);
+    if (user.credentials === undefined) throw new Error("Credential does not exist")
+    let cred = user.credentials[cred_id];
 
-    console.log("Login", cred)
-
-    let { id, publicKey, counter, transports } = cred || {};
+    let { id, publicKey, counter, transports } = cred;
     if (!id || !publicKey) {
       throw new Error('Missing credential data');
     }
@@ -471,16 +474,16 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
       requireUserVerification: true,
     });
 
-    let { verified, authenticationInfo } = verification || {};
+    let { verified, authenticationInfo } = verification;
     if (!verified) {
       throw new Error('WebAuthn verification failed');
     }
 
     let lambda = user.lambda;
 
-    console.log(authenticationInfo.newCounter);
-
+    user.credentials[cred_id].counter = authenticationInfo.newCounter;
     user.current_challenge = '';
+
     await db.update(uuid, user);
 
     res.json({
