@@ -434,6 +434,7 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
     }
 
     let cred = JSON.parse(user.credentials)[0];
+    console.log(cred)
     let { id, publicKey, counter } = cred || {};
     if (!id || !publicKey) {
       throw new Error('Missing credential data');
