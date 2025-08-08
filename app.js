@@ -18,9 +18,9 @@ import {
 let port = process.env.PORT || 9187;
 let app = express();
 let userCreations = [];
-let rpID = 'ma-at-home.hackrland.dev';
+let rpID = 'tensamin.methanium.net';
 let rpName = 'Tensamin';
-let origin = "https://ma-at-home.hackrland.dev";
+let origin = "https://tensamin.methanium.net";
 
 // Environment
 app.use(cors({ origin: origin, credentials: true }));
