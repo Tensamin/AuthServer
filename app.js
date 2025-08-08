@@ -387,7 +387,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
             allowCredentials: [
                 {
                     id: cred.credID,
-                    transports: ['usb', 'ble', 'nfc', 'internal']
+                    transports: ['internal', 'usb', 'nfc', 'smart-card', 'hybrid', 'cable', 'ble']
                 }
             ],
             userVerification: 'required',
