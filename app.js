@@ -329,12 +329,13 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
       throw new Error('WebAuthn verification failed');
     }
 
-    let { credential } = registrationInfo || {};
+    let { cred } = registrationInfo || {};
+    console.log("Register", cred)
     let {
       id,
       publicKey,
       counter,
-    } = credential || {};
+    } = cred || {};
 
     if (!id || !publicKey) {
       throw new Error('Missing credential data');
@@ -434,6 +435,9 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
     }
 
     let cred = JSON.parse(user.credentials)[0];
+
+    console.log("Login", cred)
+
     let { id, publicKey, counter } = cred || {};
     if (!id || !publicKey) {
       throw new Error('Missing credential data');
