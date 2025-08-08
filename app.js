@@ -332,11 +332,11 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
     let { credential } = registrationInfo || {};
     let {
       id,
-      publicKey: credentialPublicKey,
+      public_key,
       counter,
     } = credential || {};
 
-    if (!id || !credentialPublicKey) {
+    if (!id || !public_key) {
       throw new Error('Missing credential data');
     }
 
@@ -348,7 +348,7 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
 
     user.credentials.push({
       id,
-      public_key: Buffer.from(credentialPublicKey).toString('base64'),
+      public_key: Buffer.from(public_key).toString('base64'),
       counter: counter || 0,
     });
 
@@ -434,8 +434,8 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
     }
 
     let cred = JSON.parse(user.credentials)[0];
-    let { credID, publicKey, counter } = cred || {};
-    if (!credID || !publicKey) {
+    let { id, public_key, counter } = cred || {};
+    if (!id || !public_key) {
       throw new Error('Missing credential data');
     }
 
@@ -445,8 +445,8 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
       expectedOrigin: origin,
       expectedRPID: rpID,
       authenticator: {
-        publicKey: Buffer.from(publicKey, 'base64'),
-        credentialID: Buffer.from(credID, 'base64'),
+        publicKey: Buffer.from(public_key, 'base64'),
+        credentialID: Buffer.from(id, 'base64'),
         counter: counter || 0,
       },
       requireUserVerification: true,
