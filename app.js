@@ -355,8 +355,11 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
 
     let cred_id = v7();
 
-    console.log(typeof(user.credentials))
-    user.credentials = JSON.parse(user.credentials) || {}
+    if (user.credentials === "") {
+        user.credentials = {}
+    } else {
+        user.credentials = JSON.parse(user.credentials)
+    }
 
     user.credentials[cred_id] = {
       id,
