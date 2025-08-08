@@ -78,7 +78,7 @@ async function createUsersTable() {
       sub_end BIGINT NOT NULL,
       lambda TEXT,
       current_challenge TEXT,
-      credentials TEXT
+      credentials LONGTEXT
     );
   `;
   try {
