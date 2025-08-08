@@ -331,20 +331,22 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
 
     let { credential } = registrationInfo || {};
     let {
-      id: credentialID,
+      id,
       publicKey: credentialPublicKey,
       counter,
     } = credential || {};
 
-    if (!credentialID || !credentialPublicKey) {
+    if (!id || !credentialPublicKey) {
       throw new Error('Missing credential data');
     }
 
     if (!Array.isArray(user.credentials)) user.credentials = [];
 
+    console.log("ASDASD 345", id)
+
     user.credentials.push({
-      credID: Buffer.from(credentialID).toString('base64'),
-      publicKey: Buffer.from(credentialPublicKey).toString('base64'),
+      id: Buffer.from(id).toString('base64'),
+      public_key: Buffer.from(credentialPublicKey).toString('base64'),
       counter: counter || 0,
     });
 
@@ -386,8 +388,8 @@ app.get('/api/login/options/:uuid', async (req, res) => {
         let options = await generateAuthenticationOptions({
             allowCredentials: [
                 {
-                    id: cred.credID,
-                    transports: ['hybrid', 'internal', 'usb', 'nfc', 'smart-card', 'cable', 'ble']
+                    id: Buffer.from(cred.id, 'base64').toString('utf8'),
+                    transports: ['internal', 'usb', 'nfc', 'smart-card', 'hybrid', 'cable', 'ble']
                 }
             ],
             userVerification: 'required',
@@ -403,8 +405,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
                 log_level: 2
             },
             data: {
-                options,
-                credential_id: cred.credID,
+                options
             }
         })
     } catch (err) {
