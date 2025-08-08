@@ -435,8 +435,8 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
     }
 
     let cred = JSON.parse(user.credentials)[0];
-    let { id, public_key, counter } = cred || {};
-    if (!id || !public_key) {
+    let { id, publicKey, counter } = cred || {};
+    if (!id || !publicKey) {
       throw new Error('Missing credential data');
     }
 
@@ -446,7 +446,7 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
       expectedOrigin: origin,
       expectedRPID: rpID,
       authenticator: {
-        publicKey: Buffer.from(public_key, 'base64'),
+        publicKey: Buffer.from(publicKey, 'base64'),
         credentialID: Buffer.from(id, 'base64'),
         counter: counter || 0,
       },
