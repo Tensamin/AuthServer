@@ -483,6 +483,7 @@ app.post('/api/login/verify/:uuid/:id', async (req, res) => {
     user.credentials[cred_id].counter = authenticationInfo.newCounter;
     user.current_challenge = '';
 
+    console.log(user.credentials)
     await db.update(uuid, user);
 
     res.json({
