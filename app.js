@@ -295,74 +295,79 @@ app.post('/api/register/options/:uuid', async (req, res) => {
 });
 
 app.post('/api/register/verify/:uuid', async (req, res) => {
-    let uuid = req.params.uuid;
+  let uuid = req.params.uuid;
 
-    try {
-        let user = await db.get(uuid);
+  try {
+    let user = await db.get(uuid);
 
-        if (req.body.private_key_hash !== user.private_key_hash) {
-            throw new Error('Permission Denied');
-        }
-
-        if (!user.current_challenge) {
-            throw new Error('Stored challenge missing for user');
-        }
-        if (!req.body.attestation) {
-            throw new Error('Missing attestation in request body');
-        }
-
-        let verification = await verifyRegistrationResponse({
-            response: req.body.attestation,
-            expectedChallenge: user.current_challenge,
-            expectedOrigin: origin,
-            expectedRPID: rpID,
-            requireUserVerification: true,
-        });
-
-        let { verified, registrationInfo } = verification || {};
-        if (!verified) {
-            throw new Error('WebAuthn verification failed');
-        }
-
-        let { credential } = registrationInfo;
-
-        let { id: credentialID, publicKey: credentialPublicKey, counter } = credential;
-        if (!credentialID || !credentialPublicKey) {
-            throw new Error("Missing credential data");
-        }
-
-        if (!Array.isArray(user.credentials)) user.credentials = [];
-
-        user.credentials.push({
-            credID: credentialID,
-            publicKey: Buffer.from(credentialPublicKey).toString('base64'),
-            counter: counter || 0,
-        });
-
-        let lambda = user.lambda
-
-        user.current_challenge = "";
-        await db.update(uuid, user);
-
-        res.json({
-            type: 'success',
-            log: {
-                message: `Verified ${uuid}`,
-                log_level: 2
-            },
-            data: {
-                lambda
-            }
-        });
-    } catch (err) {
-        res.json({
-            type: 'error',
-            log: {
-                message: `Failed to verify ${uuid}: ${err.message}`,
-                log_level: 2,
-            },
-        });
+    if (req.body.private_key_hash !== user.private_key_hash) {
+      throw new Error('Permission Denied');
     }
+
+    if (!user.current_challenge) {
+      throw new Error('Stored challenge missing for user');
+    }
+
+    if (!req.body.attestation) {
+      throw new Error('Missing attestation in request body');
+    }
+
+    let verification = await verifyRegistrationResponse({
+      response: req.body.attestation,
+      expectedChallenge: user.current_challenge,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
+      requireUserVerification: true,
+    });
+
+    let { verified, registrationInfo } = verification || {};
+    if (!verified) {
+      throw new Error('WebAuthn verification failed');
+    }
+
+    let { credential } = registrationInfo || {};
+    let {
+      id: credentialID,
+      publicKey: credentialPublicKey,
+      counter,
+    } = credential || {};
+
+    if (!credentialID || !credentialPublicKey) {
+      throw new Error('Missing credential data');
+    }
+
+    if (!Array.isArray(user.credentials)) user.credentials = [];
+
+    user.credentials.push({
+      credID: Buffer.from(credentialID).toString('base64'),
+      publicKey: Buffer.from(credentialPublicKey).toString('base64'),
+      counter: counter || 0,
+    });
+
+    let lambda = user.lambda;
+
+    user.current_challenge = '';
+    await db.update(uuid, user);
+
+    res.json({
+      type: 'success',
+      log: {
+        message: `Verified ${uuid}`,
+        log_level: 2,
+      },
+      data: {
+        lambda,
+      },
+    });
+  } catch (err) {
+    res.json({
+      type: 'error',
+      log: {
+        message: `Failed to verify ${uuid}: ${err.message}`,
+        log_level: 2,
+      },
+    });
+  }
 });
 
 app.get('/api/login/options/:uuid', async (req, res) => {
@@ -410,51 +415,77 @@ app.get('/api/login/options/:uuid', async (req, res) => {
 });
 
 app.post('/api/login/verify/:uuid', async (req, res) => {
-    let uuid = req.params.uuid;
+  let uuid = req.params.uuid;
 
-    try {
-        if (req.body.attestation) {
-            let user = await db.get(uuid)
-            let cred = user.credentials[0];
-            let verification = await verifyAuthenticationResponse({
-                response: req.body.attestation,
-                expectedChallenge: user.current_challenge,
-                expectedOrigin: origin,
-                expectedRPID: rpID,
-                authenticator: {
-                    publicKey: Buffer.from(cred.publicKey, "base64"),
-                    credentialID: Buffer.from(cred.credID, "base64"),
-                    counter: cred.counter,
-                },
-                requireUserVerification: true,
-            })
-            let { verified, authenticationInfo } = verification;
-            if (verified) {
-                let lambda = user.lambda
-                cred.counter = authenticationInfo.newCounter
-                user.current_challenge = "";
-                await db.update(uuid, user)
-                res.json({
-                    type: "success",
-                    log: {
-                        message: `Verified ${uuid}`,
-                        log_level: 2
-                    },
-                    data: {
-                        lambda
-                    }
-                })
-            } else throw new Error("Verification Failed")
-        } else throw new Error("Missing Values");
-    } catch (err) {
-        res.json({
-            type: "error",
-            log: {
-                message: `Failed to verify ${uuid}: ${err.message}`,
-                log_level: 2
-            }
-        })
+  try {
+    let user = await db.get(uuid);
+
+    if (req.body.private_key_hash !== user.private_key_hash) {
+      throw new Error('Permission Denied');
     }
+
+    if (!user.current_challenge) {
+      throw new Error('Stored challenge missing for user');
+    }
+
+    if (!req.body.attestation) {
+      throw new Error('Missing attestation in request body');
+    }
+
+    if (!Array.isArray(user.credentials) || user.credentials.length === 0) {
+      throw new Error('No credentials registered for user');
+    }
+
+    let cred = user.credentials[0];
+    let { credID, publicKey, counter } = cred || {};
+    if (!credID || !publicKey) {
+      throw new Error('Missing credential data');
+    }
+
+    let verification = await verifyAuthenticationResponse({
+      response: req.body.attestation,
+      expectedChallenge: user.current_challenge,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
+      authenticator: {
+        publicKey: Buffer.from(publicKey, 'base64'),
+        credentialID: Buffer.from(credID, 'base64'),
+        counter: counter || 0,
+      },
+      requireUserVerification: true,
+    });
+
+    let { verified, authenticationInfo } = verification || {};
+    if (!verified) {
+      throw new Error('WebAuthn verification failed');
+    }
+
+    let lambda = user.lambda;
+
+    cred.counter = authenticationInfo.newCounter || cred.counter || 0;
+
+    user.current_challenge = '';
+    await db.update(uuid, user);
+
+    res.json({
+      type: 'success',
+      log: {
+        message: `Verified ${uuid}`,
+        log_level: 2,
+      },
+      data: {
+        lambda,
+      },
+    });
+  } catch (err) {
+    res.json({
+      type: 'error',
+      log: {
+        message: `Failed to verify ${uuid}: ${err.message}`,
+        log_level: 2,
+      },
+    });
+  }
 });
 
 // Iota Endpoints
