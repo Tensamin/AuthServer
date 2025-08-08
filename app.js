@@ -263,7 +263,11 @@ app.post('/api/register/options/:uuid', async (req, res) => {
                 userName: user.username,
                 userDisplayName: user.display,
                 attestationType: 'none',
-                authenticatorSelection: { userVerification: 'required' },
+                authenticatorSelection: { 
+                    userVerification: 'required',
+                    authenticatorAttachment: 'platform'
+                },
+                preferredAuthenticatorType: 'localDevice',
                 supportedAlgorithmIDs: [-7],
             })
 
