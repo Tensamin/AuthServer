@@ -355,7 +355,8 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
 
     let cred_id = v7();
 
-    user.credentials = JSON.parse(user.credentials)
+    console.log(typeof(user.credentials))
+    user.credentials = JSON.parse(user.credentials) || {}
 
     user.credentials[cred_id] = {
       id,
@@ -450,16 +451,11 @@ app.post('/api/login/verify/:uuid/:id', async (req, res) => {
       throw new Error('Missing attestation in request body');
     }
 
-    console.log("1")
     user.credentials = JSON.parse(user.credentials);
-    console.log("2")
     if (user.credentials === undefined) throw new Error("Credential does not exist")
-    console.log("3")
     let cred = user.credentials[cred_id];
-    console.log("4")
 
     let { id, publicKey, counter, transports } = cred;
-    console.log("5")
     if (!id || !publicKey) {
       throw new Error('Missing credential data');
     }
@@ -477,21 +473,16 @@ app.post('/api/login/verify/:uuid/:id', async (req, res) => {
       },
       requireUserVerification: true,
     });
-    console.log("6")
 
     let { verified, authenticationInfo } = verification;
-    console.log("7")
     if (!verified) {
       throw new Error('WebAuthn verification failed');
     }
 
     let lambda = user.lambda;
-    console.log("8")
 
     user.credentials[cred_id].counter = authenticationInfo.newCounter;
-    console.log("9")
     user.current_challenge = '';
-    console.log("10")
 
     await db.update(uuid, user);
 
