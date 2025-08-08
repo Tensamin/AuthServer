@@ -27,7 +27,7 @@ app.use(cors({ origin: origin, credentials: true }));
 app.use(express.json({ limit: "16mb" }));
 app.use(express.urlencoded({ extended: true, limit: "16mb" }));
 
-// Avatar Function
+// Helper Functions
 async function adjustAvatar(base64Input, bypass = false, quality = 80) {
     if (bypass) {
         return base64Input;
@@ -48,6 +48,17 @@ async function adjustAvatar(base64Input, bypass = false, quality = 80) {
     } catch (err) {
         throw new Error(err.message);
     }
+}
+
+function base64ToUint8Array(base64String) {
+  let binaryString = atob(base64String);
+  let len = binaryString.length;
+  let bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  return bytes;
 }
 
 // User Endpoints
@@ -335,6 +346,7 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
       id,
       publicKey,
       counter,
+      transports,
     } = credential || {};
 
     if (!id || !publicKey) {
@@ -351,6 +363,7 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
       id,
       publicKey: Buffer.from(publicKey).toString('base64'),
       counter: counter || 0,
+      transports: JSON.stringify(transports),
     });
 
     let lambda = user.lambda;
@@ -438,7 +451,7 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
 
     console.log("Login", cred)
 
-    let { id, publicKey, counter } = cred || {};
+    let { id, publicKey, counter, transports } = cred || {};
     if (!id || !publicKey) {
       throw new Error('Missing credential data');
     }
@@ -449,9 +462,10 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
       expectedOrigin: origin,
       expectedRPID: rpID,
       authenticator: {
-        publicKey: Buffer.from(publicKey, 'base64'),
-        credentialID: Buffer.from(id, 'base64'),
+        publicKey: base64ToUint8Array(publicKey),
+        credentialID: id,
         counter: counter || 0,
+        transports: JSON.parse(transports),
       },
       requireUserVerification: true,
     });
