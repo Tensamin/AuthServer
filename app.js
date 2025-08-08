@@ -342,10 +342,8 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
 
     if (!Array.isArray(user.credentials)) user.credentials = [];
 
-    console.log("ASDASD 345", id)
-
     user.credentials.push({
-      id: Buffer.from(id).toString('base64'),
+      id,
       public_key: Buffer.from(credentialPublicKey).toString('base64'),
       counter: counter || 0,
     });
@@ -388,7 +386,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
         let options = await generateAuthenticationOptions({
             allowCredentials: [
                 {
-                    id: Buffer.from(cred.id, 'base64').toString('utf8'),
+                    id: cred.id,
                     transports: ['internal', 'usb', 'nfc', 'smart-card', 'hybrid', 'cable', 'ble']
                 }
             ],
