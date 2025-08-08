@@ -330,13 +330,14 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
     }
 
     let { credential } = registrationInfo || {};
+    console.log(credential)
     let {
       id,
-      public_key,
+      publicKey,
       counter,
     } = credential || {};
 
-    if (!id || !public_key) {
+    if (!id || !publicKey) {
       throw new Error('Missing credential data');
     }
 
@@ -348,7 +349,7 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
 
     user.credentials.push({
       id,
-      public_key: Buffer.from(public_key).toString('base64'),
+      public_key: Buffer.from(publicKey).toString('base64'),
       counter: counter || 0,
     });
 
