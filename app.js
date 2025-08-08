@@ -413,12 +413,11 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
     let uuid = req.params.uuid;
 
     try {
-        if (req.body.assertion) {
+        if (req.body.attestation) {
             let user = await db.get(uuid)
             let cred = user.credentials[0];
-            console.log("CRED CREDID", cred.credID)
             let verification = await verifyAuthenticationResponse({
-                response: req.body.assertion,
+                response: req.body.attestation,
                 expectedChallenge: user.current_challenge,
                 expectedOrigin: origin,
                 expectedRPID: rpID,
@@ -454,68 +453,6 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
                 message: `Failed to verify ${uuid}: ${err.message}`,
                 log_level: 2
             }
-        })
-    }
-});
-
-// Deprecated
-app.post('/api/login', async (req, res) => {
-    try {
-        let data = req.body
-
-        if (data.uuid && data.private_key_hash) {
-            let private_key_hash = await db.get_private_key_hash(data.uuid)
-            let iota_id = await db.get_iota_id(data.uuid)
-            if (private_key_hash.success) {
-                if (private_key_hash.message === data.private_key_hash) {
-                    res.json({
-                        type: "message",
-                        log: {
-                            message: "User login: Hash matches",
-                            log_level: 0
-                        },
-                        data: {
-                            iota_id: iota_id
-                        }
-                    })
-                } else {
-                    res.json({
-                        type: "error",
-                        log: {
-                            message: "Hash does not match",
-                            log_level: 1
-                        },
-                        data: {}
-                    })
-                }
-            } else {
-                res.status(500).json({
-                    type: "error",
-                    log: {
-                        message: private_key_hash.message,
-                        log_level: 1
-                    },
-                    data: {}
-                })
-            }
-        } else {
-            res.json({
-                type: "error",
-                log: {
-                    message: "Failed do to missing values",
-                    log_level: 1
-                },
-                data: {}
-            })
-        }
-    } catch (err) {
-        res.status(500).json({
-            type: "error",
-            log: {
-                message: err.message,
-                log_level: 1
-            },
-            data: {}
         })
     }
 });
