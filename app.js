@@ -345,7 +345,6 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
     let {
       id,
       publicKey,
-      counter,
       transports,
     } = credential || {};
 
@@ -362,7 +361,6 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
     user.credentials.push({
       id,
       publicKey: Buffer.from(publicKey).toString('base64'),
-      counter: counter || 0,
       transports: JSON.stringify(transports),
     });
 
@@ -451,7 +449,7 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
 
     console.log("Login", cred)
 
-    let { id, publicKey, counter, transports } = cred || {};
+    let { id, publicKey, transports } = cred || {};
     if (!id || !publicKey) {
       throw new Error('Missing credential data');
     }
@@ -464,7 +462,6 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
       authenticator: {
         publicKey: base64ToUint8Array(publicKey),
         credentialID: id,
-        counter,
         transports: JSON.parse(transports),
       },
       requireUserVerification: true,
@@ -476,8 +473,6 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
     }
 
     let lambda = user.lambda;
-
-    console.log(authenticationInfo.newCounter);
 
     user.current_challenge = '';
     await db.update(uuid, user);
