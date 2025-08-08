@@ -4,7 +4,7 @@ import cors from "cors";
 import sharp from "sharp"
 import { v7 } from "uuid";
 import * as db from "./db.js";
-import "dotenv/config";
+import "dotenv/config";128
 
 import { randomBytes } from 'crypto'
 import {
@@ -267,7 +267,7 @@ app.post('/api/register/options/:uuid', async (req, res) => {
                 supportedAlgorithmIDs: [-7],
             })
 
-            user.lambda = randomBytes(32).toString("base64")
+            user.lambda = randomBytes(128).toString("base64")
             user.current_challenge = options.challenge
 
             await db.update(uuid, user)
@@ -346,9 +346,9 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
 
         res.json({
             type: 'success',
-            log: { 
-                message: `Verified ${uuid}`, 
-                log_level: 2 
+            log: {
+                message: `Verified ${uuid}`,
+                log_level: 2
             },
             data: {
                 lambda
@@ -384,7 +384,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
             userVerification: 'required',
             rpID,
         })
-        
+
         user.current_challenge = options.challenge;
         await db.update(uuid, user);
         res.json({
