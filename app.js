@@ -283,7 +283,7 @@ app.post('/api/register/options/:uuid', async (req, res) => {
                     log_level: 2
                 },
                 data: {
-                    options
+                    options: btoa(options)
                 }
             })
         } else throw new Error("Permission Denied")
@@ -405,7 +405,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
                 log_level: 2
             },
             data: {
-                options
+                options: btoa(options)
             }
         })
     } catch (err) {
