@@ -420,10 +420,6 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
   try {
     let user = await db.get(uuid);
 
-    if (req.body.private_key_hash !== user.private_key_hash) {
-      throw new Error('Permission Denied');
-    }
-
     if (!user.current_challenge) {
       throw new Error('Stored challenge missing for user');
     }
