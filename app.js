@@ -267,7 +267,6 @@ app.post('/api/register/options/:uuid', async (req, res) => {
     try {
         let user = await db.get(uuid);
         if (req.body.private_key_hash === user.private_key_hash) {
-            user.credentials = []
             let options = await generateRegistrationOptions({
                 rpName,
                 rpID,
@@ -348,7 +347,7 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
       publicKey,
       counter,
       transports,
-    } = credential || {};
+    } = credential;
 
     if (!id || !publicKey) {
       throw new Error('Missing credential data');
@@ -399,7 +398,7 @@ app.get('/api/login/options/:uuid/:id', async (req, res) => {
     try {
         let user = await db.get(uuid);
         user.credentials = JSON.parse(user.credentials)
-        if (user.credentials === undefined) throw new Error("Credential does not exist")
+        if (user.credentials[cred_id] === undefined) throw new Error("Credential does not exist")
         let cred = user.credentials[cred_id];
 
         let options = await generateAuthenticationOptions({
