@@ -340,7 +340,11 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
       throw new Error('Missing credential data');
     }
 
-    if (!Array.isArray(user.credentials)) user.credentials = [];
+    if (!Array.isArray(JSON.parse(user.credentials))) {
+        user.credentials = []
+    } else {
+        user.credentials = JSON.parse(user.credentials)
+    };
 
     user.credentials.push({
       id,
@@ -380,9 +384,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
     try {
         let user = await db.get(uuid);
         let cred = JSON.parse(user.credentials)[0];
-        if (!cred) {
-            throw new Error("No credentials registered for this user");
-        }
+
         let options = await generateAuthenticationOptions({
             allowCredentials: [
                 {
@@ -431,11 +433,7 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
       throw new Error('Missing attestation in request body');
     }
 
-    if (!Array.isArray(user.credentials) || user.credentials.length === 0) {
-      throw new Error('No credentials registered for user');
-    }
-
-    let cred = user.credentials[0];
+    let cred = JSON.parse(user.credentials)[0];
     let { credID, publicKey, counter } = cred || {};
     if (!credID || !publicKey) {
       throw new Error('Missing credential data');
