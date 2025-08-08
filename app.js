@@ -464,7 +464,7 @@ app.post('/api/login/verify/:uuid', async (req, res) => {
       authenticator: {
         publicKey: base64ToUint8Array(publicKey),
         credentialID: id,
-        counter: counter || 0,
+        counter,
         transports: JSON.parse(transports),
       },
       requireUserVerification: true,
