@@ -380,7 +380,7 @@ app.get('/api/login/options/:uuid', async (req, res) => {
     try {
         let user = await db.get(uuid);
         let cred = JSON.parse(user.credentials)[0];
-        if (!user?.credentials?.length) {
+        if (!cred) {
             throw new Error("No credentials registered for this user");
         }
         let options = await generateAuthenticationOptions({
