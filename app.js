@@ -330,7 +330,7 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
     }
 
     let { credential } = registrationInfo || {};
-    console.log("Register", cred)
+    console.log("Register", credential)
     let {
       id,
       publicKey,
