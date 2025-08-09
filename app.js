@@ -61,6 +61,22 @@ function base64ToUint8Array(base64String) {
     return bytes;
 }
 
+function isBase64(str) {
+  if (typeof str !== 'string') return false;
+  let s = str.trim();
+  if (s.length === 0) return true;
+  if (s.length % 4 !== 0) return false;
+  if (!/^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/.test(s)) return false;
+
+  try {
+    let buf = Buffer.from(s, 'base64');
+    let reencoded = buf.toString('base64');
+    return reencoded === s || reencoded.replace(/=+$/, '') === s;
+  } catch {
+    return false;
+  }
+}
+
 // User Endpoints
 app.get('/api/get/uuid/:username', async (req, res) => {
     let username = req.params.username;
@@ -211,7 +227,11 @@ app.post('/api/change/about/:uuid', async (req, res) => {
         if ("private_key_hash" in req.body && "about" in req.body) {
             let user = await db.get(uuid);
             if (req.body.private_key_hash === user.private_key_hash) {
-                user.about = btoa(req.body.about);
+                if (isBase64(req.body.about)) {
+                    user.about = req.body.about;
+                } else {
+                    user.about = btoa(req.body.about);
+                }
                 await db.update(uuid, user);
                 res.json({
                     type: "success",
