@@ -114,7 +114,7 @@ export async function add(uuid, public_key, private_key_hash, username, token, i
     let connection = await pool.getConnection();
     await connection.execute(`
     INSERT INTO users (uuid, public_key, private_key_hash, username, token, iota_id, created_at, display, avatar, about, status, sub_level, sub_end, lambda, current_challenge)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,?, ?, ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,?, ?, ?, ? , ?);
   `, [uuid, public_key, private_key_hash, username, token, iota_id, created_at, "", "", "", "", 0, 0, "", ""]);
     connection.release();
 
