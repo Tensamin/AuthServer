@@ -298,7 +298,7 @@ app.post('/api/change/iota-id/:uuid', async (req, res) => {
                     }
                 })
             } else throw new Error("Permission Denied")
-        } else throw new Error("Missing Values")
+        } else throw new Error(`Missing Values, got: ${"reset_token" in req.body && "Reset Token"} ${"new_token" in req.body && "New Token"} ${"iota_id" in req.body && "Iota ID"}`)
     } catch (err) {
         res.json({
             type: "error",
