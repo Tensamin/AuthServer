@@ -353,11 +353,9 @@ app.post('/api/register/options/:uuid', async (req, res) => {
                 userDisplayName: user.display,
                 attestationType: 'none',
                 authenticatorSelection: {
-                    userVerification: 'required',
-                    authenticatorAttachment: 'platform'
+                    userVerification: 'preferred',
                 },
-                preferredAuthenticatorType: 'localDevice',
-                supportedAlgorithmIDs: [-7],
+                supportedAlgorithmIDs: [-7, -257],
             })
 
             user.lambda = randomBytes(128).toString("base64")
