@@ -111,7 +111,7 @@ app.get('/api/get/:uuid', async (req, res) => {
         res.json({
             type: "success",
             log: {
-                message: `Got user ${uuid}`,
+                message: "Got user",
                 log_level: 0,
             },
             data: {
@@ -130,7 +130,7 @@ app.get('/api/get/:uuid', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to get user for ${uuid}: ${err.message}`,
+                message: `Failed to get user: ${err.message}`,
                 log_level: 1,
             }
         })
@@ -148,7 +148,7 @@ app.post('/api/change/username/:uuid', async (req, res) => {
                 res.json({
                     type: "success",
                     log: {
-                        message: `Changed username for ${uuid}`,
+                        message: "Changed username",
                         log_level: 0,
                     }
                 })
@@ -158,7 +158,7 @@ app.post('/api/change/username/:uuid', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to change username for ${uuid}: ${err.message}`,
+                message: `Failed to change username: ${err.message}`,
                 log_level: 0,
             }
         })
@@ -176,7 +176,7 @@ app.post('/api/change/display/:uuid', async (req, res) => {
                 res.json({
                     type: "success",
                     log: {
-                        message: `Changed display for ${uuid}`,
+                        message: "Changed display",
                         log_level: 0,
                     }
                 })
@@ -186,7 +186,7 @@ app.post('/api/change/display/:uuid', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to change display for ${uuid}: ${err.message}`,
+                message: `Failed to change display: ${err.message}`,
                 log_level: 0,
             }
         })
@@ -204,7 +204,7 @@ app.post('/api/change/avatar/:uuid', async (req, res) => {
                 res.json({
                     type: "success",
                     log: {
-                        message: `Changed avatar for ${uuid}`,
+                        message: "Changed avatar",
                         log_level: 0,
                     }
                 })
@@ -214,7 +214,7 @@ app.post('/api/change/avatar/:uuid', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to change avatar for ${uuid}: ${err.message}`,
+                message: `Failed to change avatar: ${err.message}`,
                 log_level: 0,
             }
         })
@@ -236,7 +236,7 @@ app.post('/api/change/about/:uuid', async (req, res) => {
                 res.json({
                     type: "success",
                     log: {
-                        message: `Changed about for ${uuid}`,
+                        message: "Changed about",
                         log_level: 0,
                     }
                 })
@@ -246,7 +246,7 @@ app.post('/api/change/about/:uuid', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to change about for ${uuid}: ${err.message}`,
+                message: `Failed to change about: ${err.message}`,
                 log_level: 0,
             }
         })
@@ -264,7 +264,7 @@ app.post('/api/change/status/:uuid', async (req, res) => {
                 res.json({
                     type: "success",
                     log: {
-                        message: `Changed status for ${uuid}`,
+                        message: "Changed status",
                         log_level: 0,
                     }
                 })
@@ -274,7 +274,7 @@ app.post('/api/change/status/:uuid', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to change status for ${uuid}: ${err.message}`,
+                message: `Failed to change status: ${err.message}`,
                 log_level: 0,
             }
         })
@@ -293,7 +293,7 @@ app.post('/api/change/iota-id/:uuid', async (req, res) => {
                 res.json({
                     type: "success",
                     log: {
-                        message: `Changed iota id for ${uuid}`,
+                        message: "Changed iota id",
                         log_level: 0,
                     }
                 })
@@ -303,7 +303,7 @@ app.post('/api/change/iota-id/:uuid', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to change iota id for ${uuid}: ${err.message}`,
+                message: `Failed to change iota id: ${err.message}`,
                 log_level: 0,
             }
         })
@@ -323,7 +323,7 @@ app.post('/api/change/keys/:uuid', async (req, res) => {
                 res.json({
                     type: "success",
                     log: {
-                        message: `Changed keys for ${uuid}`,
+                        message: "Changed keys",
                         log_level: 0,
                     }
                 })
@@ -333,7 +333,7 @@ app.post('/api/change/keys/:uuid', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to change keys for ${uuid}: ${err.message}`,
+                message: `Failed to change keys: ${err.message}`,
                 log_level: 0,
             }
         })
@@ -368,7 +368,7 @@ app.post('/api/register/options/:uuid', async (req, res) => {
             res.json({
                 type: "success",
                 log: {
-                    message: `Got registration options for ${uuid}`,
+                    message: "Got registration options",
                     log_level: 2
                 },
                 data: {
@@ -380,7 +380,7 @@ app.post('/api/register/options/:uuid', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to get registration options for ${uuid}: ${err.message}`,
+                message: `Failed to get registration options: ${err.message}`,
                 log_level: 2
             }
         })
@@ -454,7 +454,7 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
         res.json({
             type: 'success',
             log: {
-                message: `Verified ${uuid}`,
+                message: "Verified",
                 log_level: 2
             },
             data: {
@@ -466,7 +466,7 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
         res.json({
             type: 'error',
             log: {
-                message: `Failed to verify ${uuid}: ${err.message}`,
+                message: `Failed to verify: ${err.message}`,
                 log_level: 2,
             },
         });
@@ -499,7 +499,7 @@ app.get('/api/login/options/:uuid/:id', async (req, res) => {
         res.json({
             type: "success",
             log: {
-                message: `Got login options for ${uuid}`,
+                message: "Got login options",
                 log_level: 2
             },
             data: {
@@ -510,7 +510,7 @@ app.get('/api/login/options/:uuid/:id', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to get login options for ${uuid}: ${err.message}`,
+                message: `Failed to get login options: ${err.message}`,
                 log_level: 2
             }
         })
@@ -570,7 +570,7 @@ app.post('/api/login/verify/:uuid/:id', async (req, res) => {
         res.json({
             type: 'success',
             log: {
-                message: `Verified ${uuid}`,
+                message: "Verified",
                 log_level: 2,
             },
             data: {
@@ -581,7 +581,7 @@ app.post('/api/login/verify/:uuid/:id', async (req, res) => {
         res.json({
             type: 'error',
             log: {
-                message: `Failed to verify ${uuid}: ${err.message}`,
+                message: `Failed to verify: ${err.message}`,
                 log_level: 2,
             },
         });
@@ -680,7 +680,7 @@ app.get('/api/get/private-key-hash/:uuid', async (req, res) => {
                 res.json({
                     type: "success",
                     log: {
-                        message: `Got private key hash for ${uuid}`,
+                        message: "Got private key hash",
                         log_level: 1,
                     },
                     data: {
@@ -693,7 +693,7 @@ app.get('/api/get/private-key-hash/:uuid', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to get private key hash for ${uuid}: ${err.message}`,
+                message: `Failed to get private key hash: ${err.message}`,
                 log_level: 1,
             }
         })
@@ -710,7 +710,7 @@ app.get('/api/get/iota-id/:uuid', async (req, res) => {
                 res.json({
                     type: "success",
                     log: {
-                        message: `Got iota id for ${uuid}`,
+                        message: "Got iota id",
                         log_level: 1,
                     },
                     data: {
@@ -723,7 +723,7 @@ app.get('/api/get/iota-id/:uuid', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to get private key hash for ${uuid}: ${err.message}`,
+                message: `Failed to get private key hash: ${err.message}`,
                 log_level: 1,
             }
         })
