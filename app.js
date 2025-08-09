@@ -4,15 +4,9 @@ import cors from "cors";
 import sharp from "sharp"
 import { v7 } from "uuid";
 import * as db from "./db.js";
-import "dotenv/config"; 128
-
-import { randomBytes } from 'crypto'
-import {
-    generateRegistrationOptions,
-    verifyRegistrationResponse,
-    generateAuthenticationOptions,
-    verifyAuthenticationResponse,
-} from '@simplewebauthn/server'
+import "dotenv/config";
+import { randomBytes } from 'crypto';
+import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 
 // Variables
 let port = process.env.PORT || 9187;
@@ -429,15 +423,13 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
             throw new Error('Missing credential data');
         }
 
-        let cred_id = v7();
-
         if (user.credentials === "") {
             user.credentials = {}
         } else {
             user.credentials = JSON.parse(user.credentials)
         }
 
-        user.credentials[cred_id] = {
+        user.credentials[id] = {
             id,
             publicKey: Buffer.from(publicKey).toString('base64'),
             counter,
@@ -456,8 +448,7 @@ app.post('/api/register/verify/:uuid', async (req, res) => {
                 log_level: 2
             },
             data: {
-                lambda,
-                cred_id
+                lambda
             }
         });
     } catch (err) {
