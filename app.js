@@ -261,6 +261,65 @@ app.post('/api/change/status/:uuid', async (req, res) => {
     }
 });
 
+app.post('/api/change/iota-id/:uuid', async (req, res) => {
+    let uuid = req.params.uuid;
+    try {
+        if ("reset_token" in req.body && "new_token" in req.body && "iota_id" in req.body) {
+            let user = await db.get(uuid);
+            if (req.body.reset_token === user.token) {
+                user.iota_id = req.body.iota_id;
+                user.reset_token = req.body.new_token;
+                await db.update(uuid, user);
+                res.json({
+                    type: "success",
+                    log: {
+                        message: `Changed iota id for ${uuid}`,
+                        log_level: 0,
+                    }
+                })
+            } else throw new Error("Permission Denied")
+        } else throw new Error("Missing Values")
+    } catch (err) {
+        res.json({
+            type: "error",
+            log: {
+                message: `Failed to change iota id for ${uuid}: ${err.message}`,
+                log_level: 0,
+            }
+        })
+    }
+});
+
+app.post('/api/change/keys/:uuid', async (req, res) => {
+    let uuid = req.params.uuid;
+    try {
+        if ("reset_token" in req.body && "new_token" in req.body && "private_key_hash" in req.body && "public_key" in req.body) {
+            let user = await db.get(uuid);
+            if (req.body.reset_token === user.token) {
+                user.private_key_hash = req.body.private_key_hash;
+                user.public_key = req.body.public_key;
+                user.reset_token = req.body.new_token;
+                await db.update(uuid, user);
+                res.json({
+                    type: "success",
+                    log: {
+                        message: `Changed status for ${uuid}`,
+                        log_level: 0,
+                    }
+                })
+            } else throw new Error("Permission Denied")
+        } else throw new Error("Missing Values")
+    } catch (err) {
+        res.json({
+            type: "error",
+            log: {
+                message: `Failed to change status for ${uuid}: ${err.message}`,
+                log_level: 0,
+            }
+        })
+    }
+});
+
 app.post('/api/register/options/:uuid', async (req, res) => {
     let uuid = req.params.uuid;
 
