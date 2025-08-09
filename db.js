@@ -11,7 +11,7 @@ function isValidColName(name) {
 
 function prepareUpdateEntries(data) {
   if (!data || typeof data !== 'object') {
-    throw new TypeError('data must be a non-null object');
+    return new TypeError('data must be a non-null object');
   }
 
   let entries = Object.entries(data).filter(([, v]) => v !== undefined);
@@ -19,7 +19,7 @@ function prepareUpdateEntries(data) {
 
   for (let [k] of entries) {
     if (!isValidColName(k)) {
-      throw new Error(
+      return new Error(
         `Invalid column name: "${k}". Allowed: [A-Za-z_][A-Za-z0-9_]*`
       );
     }
@@ -120,7 +120,7 @@ export async function add(uuid, public_key, private_key_hash, username, token, i
 
     return "Created User";
   } catch (err) {
-    throw new Error(err.message);
+    return new Error(err.message);
   };
 };
 
@@ -134,17 +134,17 @@ export async function remove(uuid, token) {
     connection.release();
 
     if (rows.length === 0) {
-      throw new Error('UUID not found.');
+      return new Error('UUID not found.');
     };
 
     if (rows[0].token !== token) {
-      throw new Error('Bad Token');
+      return new Error('Bad Token');
     };
 
     await connection.execute('DELETE FROM users WHERE uuid = ?', [uuid]);
     return "Deleted User";
   } catch (err) {
-    throw new Error(err.message);
+    return new Error(err.message);
   };
 };
 
@@ -155,12 +155,12 @@ export async function uuid(username) {
     connection.release();
 
     if (rows.length === 0) {
-      throw new Error('UUID not found.')
+      return new Error('UUID not found.')
     };
 
     return rows[0].uuid;
   } catch (err) {
-    throw new Error(err.message);
+    return new Error(err.message);
   };
 };
 
@@ -179,7 +179,7 @@ export async function get(uuid) {
     delete row.uuid;
     return row;
   } catch (err) {
-    throw err;
+    return err;
   } finally {
     if (connection) connection.release();
   }
@@ -193,7 +193,7 @@ export async function update(uuid, data) {
 
     let placeholderCount = (setExpr.match(/\?/g) || []).length;
     if (placeholderCount !== values.length) {
-      throw new Error(
+      return new Error(
         `Placeholder/value mismatch: ${placeholderCount} placeholders ` +
         `but ${values.length} values`
       );
@@ -207,7 +207,7 @@ export async function update(uuid, data) {
     );
     return result.affectedRows > 0;
   } catch (err) {
-    throw err;
+    return err;
   } finally {
     if (connection) connection.release();
   }
@@ -223,12 +223,12 @@ export async function checkLegitimacy(uuid) {
     connection.release();
 
     if (rows.length === 0) {
-      throw new Error('UUID not found.')
+      return new Error('UUID not found.')
     }
 
     return rows[0].uuid === uuid;
   } catch (err) {
-    throw new Error(err.message);
+    return new Error(err.message);
   }
 }
 
