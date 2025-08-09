@@ -66,7 +66,7 @@ async function createUsersTable() {
       uuid VARCHAR(36) NOT NULL PRIMARY KEY,
       public_key TEXT NOT NULL,
       private_key_hash VARCHAR(128) NOT NULL,
-      iota_id VARCHAR(255) NOT NULL,
+      iota_id VARCHAR(36) NOT NULL,
       token VARCHAR(255) NOT NULL UNIQUE,
       username VARCHAR(15) NOT NULL UNIQUE,
       created_at BIGINT NOT NULL,
