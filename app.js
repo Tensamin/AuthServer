@@ -537,7 +537,6 @@ app.post('/api/register/complete', async (req, res) => {
             "username" in req.body &&
             "public_key" in req.body &&
             "private_key_hash" in req.body &&
-            "username" in req.body &&
             "iota_id" in req.body) {
 
             let tokenPart1 = v7();
