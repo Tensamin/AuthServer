@@ -288,7 +288,7 @@ app.post('/api/change/iota-id/:uuid', async (req, res) => {
             let user = await db.get(uuid);
             if (req.body.reset_token === user.token) {
                 user.iota_id = req.body.iota_id;
-                user.reset_token = req.body.new_token;
+                user.token = req.body.new_token;
                 await db.update(uuid, user);
                 res.json({
                     type: "success",
