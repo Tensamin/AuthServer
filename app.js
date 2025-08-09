@@ -303,7 +303,7 @@ app.post('/api/change/keys/:uuid', async (req, res) => {
                 res.json({
                     type: "success",
                     log: {
-                        message: `Changed status for ${uuid}`,
+                        message: `Changed keys for ${uuid}`,
                         log_level: 0,
                     }
                 })
@@ -313,7 +313,7 @@ app.post('/api/change/keys/:uuid', async (req, res) => {
         res.json({
             type: "error",
             log: {
-                message: `Failed to change status for ${uuid}: ${err.message}`,
+                message: `Failed to change keys for ${uuid}: ${err.message}`,
                 log_level: 0,
             }
         })
