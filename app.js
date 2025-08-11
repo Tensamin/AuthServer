@@ -352,7 +352,9 @@ app.post('/api/register/options/:uuid', async (req, res) => {
                 supportedAlgorithmIDs: [-7, -257],
             })
 
-            user.lambda = randomBytes(128).toString("base64")
+            if (!user.lambda) {
+                user.lambda = randomBytes(128).toString("base64");
+            }
             user.current_challenge = options.challenge
 
             await db.update(uuid, user)
