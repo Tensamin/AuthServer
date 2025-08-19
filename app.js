@@ -674,7 +674,7 @@ app.post('/api/delete/:uuid', async (req, res) => {
             res.json({
                 type: "success",
                 log: {
-                    message: `Deleted User: ${req.body.uuid}`,
+                    message: `Deleted User: ${uuid}`,
                     log_level: 0,
                 }
             });
