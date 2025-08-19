@@ -663,6 +663,40 @@ app.post('/api/register/complete', async (req, res) => {
     }
 });
 
+app.post('/api/delete/:uuid', async (req, res) => {
+    try {
+        if ("uuid" in req.body &&
+            "reset_token" in req.body) {
+
+            db.remove(req.body.uuid, req.body.reset_token);
+
+            res.json({
+                type: "success",
+                log: {
+                    message: `Deleted User: ${req.body.uuid}`,
+                    log_level: 0,
+                }
+            });
+        } else {
+            res.status(400).json({
+                type: "error",
+                log: {
+                    message: "User creation failed do to missing values",
+                    log_level: 1,
+                }
+            });
+        };
+    } catch (err) {
+        res.status(500).json({
+            type: "error",
+            log: {
+                message: err.message,
+                log_level: 1,
+            }
+        })
+    }
+});
+
 // Omikron Endpoints
 app.get('/api/get/private-key-hash/:uuid', async (req, res) => {
     let uuid = req.params.uuid;
