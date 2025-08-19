@@ -664,11 +664,12 @@ app.post('/api/register/complete', async (req, res) => {
 });
 
 app.post('/api/delete/:uuid', async (req, res) => {
-    try {
-        if ("uuid" in req.body &&
-            "reset_token" in req.body) {
+    let uuid = req.params.uuid;
 
-            db.remove(req.body.uuid, req.body.reset_token);
+    try {
+        if ("reset_token" in req.body) {
+
+            db.remove(uuid, req.body.reset_token);
 
             res.json({
                 type: "success",
