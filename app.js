@@ -84,7 +84,7 @@ app.get('/api/get/uuid/:username', async (req, res) => {
                 log_level: 0,
             },
             data: {
-                uuid,
+                user_id: uuid,
             }
         })
     } catch (err) {
