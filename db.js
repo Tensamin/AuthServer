@@ -81,13 +81,15 @@ async function createUsersTable() {
       credentials LONGTEXT
     );
   `;
+  let connection;
   try {
-    let connection = await pool.getConnection();
+    connection = await pool.getConnection();
     await connection.execute(createTableQuery);
-    connection.release();
   } catch (err) {
     console.error('Error creating users table:', err);
     throw err;
+  } finally {
+    if (connection) connection.release();
   };
 };
 
@@ -99,69 +101,76 @@ async function createOmikronUUIDsTable() {
       ip VARCHAR(45) NOT NULL
     );
   `;
+  let connection;
   try {
-    let connection = await pool.getConnection();
+    connection = await pool.getConnection();
     await connection.execute(createOmikronUUIDsTableQuery);
-    connection.release();
   } catch (err) {
-    console.error('Error creating users table:', err);
+    console.error('Error creating omikron_uuids table:', err);
     throw err;
+  } finally {
+    if (connection) connection.release();
   };
 };
 
 export async function add(uuid, public_key, private_key_hash, username, token, iota_id, created_at) {
+  let connection;
   try {
-    let connection = await pool.getConnection();
+    connection = await pool.getConnection();
     await connection.execute(`
     INSERT INTO users (uuid, public_key, private_key_hash, username, token, iota_id, created_at, display, avatar, about, status, sub_level, sub_end, lambda, current_challenge, credentials)
     VALUES (?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,?, ?, ?, ? , ?, ?);
   `, [uuid, public_key, private_key_hash, username, token, iota_id, created_at, "", "", "", "", 0, 0, "", "", "{}"]);
-    connection.release();
-
     return "Created User";
   } catch (err) {
     return new Error(err.message);
+  } finally {
+    if (connection) connection.release();
   };
 };
 
 export async function remove(uuid, token) {
+  let connection;
   try {
-    let connection = await pool.getConnection();
+    connection = await pool.getConnection();
     let [rows] = await connection.execute(
       'SELECT token FROM users WHERE uuid = ?',
       [uuid]
     );
-    connection.release();
 
     if (rows.length === 0) {
       return new Error('UUID not found.');
-    };
+    }
 
     if (rows[0].token !== token) {
       return new Error('Bad Token');
-    };
+    }
 
     await connection.execute('DELETE FROM users WHERE uuid = ?', [uuid]);
     return "Deleted User";
   } catch (err) {
     return new Error(err.message);
-  };
+  } finally {
+    if (connection) connection.release();
+  }
 };
 
 export async function uuid(username) {
+  let connection;
   try {
-    let connection = await pool.getConnection();
+    connection = await pool.getConnection();
     let [rows] = await connection.execute(`SELECT uuid FROM users WHERE username = ?;`, [username]);
-    connection.release();
 
     if (rows.length === 0) {
       return new Error('UUID not found.')
-    };
+    }
 
     return rows[0].uuid;
   } catch (err) {
     return new Error(err.message);
-  };
+  } finally {
+    if (connection) connection.release();
+  }
 };
 
 export async function get(uuid) {
@@ -214,13 +223,13 @@ export async function update(uuid, data) {
 }
 
 export async function checkLegitimacy(uuid) {
+  let connection;
   try {
-    let connection = await pool.getConnection();
+    connection = await pool.getConnection();
     let [rows] = await connection.execute(
       `SELECT uuid FROM omikron_uuids WHERE uuid = ?;`,
       [uuid]
     );
-    connection.release();
 
     if (rows.length === 0) {
       return new Error('UUID not found.')
@@ -229,6 +238,8 @@ export async function checkLegitimacy(uuid) {
     return rows[0].uuid === uuid;
   } catch (err) {
     return new Error(err.message);
+  } finally {
+    if (connection) connection.release();
   }
 }
 
@@ -246,21 +257,33 @@ async function removeOneDayFromEverySubscription() {
   console.log(`Removed 1 day from all subscriptions at ${now.toISOString()} (local time: ${now.toLocaleString()}).`)
   try {
     let connection = await pool.getConnection();
-    await connection.execute(`UPDATE users
+    try {
+      await connection.execute(`UPDATE users
 SET sub_end = GREATEST(0, sub_end - 1);`, []);
-    await connection.execute(`UPDATE users
+      await connection.execute(`UPDATE users
 SET sub_level = 0
 WHERE sub_end = 0;`, []);
-    connection.release();
+    } finally {
+      connection.release();
+    }
   } catch (err) {
     console.error(err)
   }
 };
 
-let job = schedule.scheduleJob({ hour: 0, minute: 0 }, function () {
-  removeOneDayFromEverySubscription();
-});
-
-console.log('Node.js scheduler started.');
-console.log('Job scheduled to run every day at 00:00 UTC.');
-console.log('Next scheduled invocation:', job.nextInvocation().toISOString());
+let job;
+try {
+  job = schedule.scheduleJob({ hour: 0, minute: 0 }, function () {
+    removeOneDayFromEverySubscription();
+  });
+  console.log('Node.js scheduler started.');
+  console.log('Job scheduled to run every day at 00:00 UTC.');
+  if (job && typeof job.nextInvocation === 'function') {
+    const next = job.nextInvocation();
+    if (next instanceof Date) {
+      console.log('Next scheduled invocation:', next.toISOString());
+    }
+  }
+} catch (e) {
+  console.warn('Scheduler setup failed:', e?.message || e);
+}
