@@ -177,6 +177,7 @@ export async function get(uuid) {
     if (!row) return null;
 
     delete row.uuid;
+    console.log(row)
     return row;
   } catch (err) {
     return err;

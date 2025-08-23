@@ -340,11 +340,8 @@ app.post('/api/change/keys/:uuid', async (req, res) => {
 app.post('/api/register/options/:uuid', async (req, res) => {
     let uuid = req.params.uuid;
 
-    console.log(req.body)
-
     try {
         let user = await db.get(uuid);
-        console.log(user)
         if (req.body.private_key_hash === user.private_key_hash) {
             let options = await generateRegistrationOptions({
                 rpName,
