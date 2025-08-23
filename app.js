@@ -701,6 +701,7 @@ app.post('/api/delete/:uuid', async (req, res) => {
 // Omikron Endpoints
 app.get('/api/get/private-key-hash/:uuid', async (req, res) => {
     let uuid = req.params.uuid;
+    
     try {
         if (req.headers.authorization && req.headers.privatekeyhash) {
             let isLegitOmikron = await db.checkLegitimacy(req.headers.authorization)
