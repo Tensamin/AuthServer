@@ -344,6 +344,7 @@ app.post('/api/register/options/:uuid', async (req, res) => {
 
     try {
         let user = await db.get(uuid);
+        console.log(user)
         if (req.body.private_key_hash === user.private_key_hash) {
             let options = await generateRegistrationOptions({
                 rpName,
