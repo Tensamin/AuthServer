@@ -165,6 +165,7 @@ export async function uuid(username) {
 };
 
 export async function get(uuid) {
+  console.log("EXEC")
   let connection;
   try {
     connection = await pool.getConnection();
@@ -180,6 +181,7 @@ export async function get(uuid) {
     console.log(row)
     return row;
   } catch (err) {
+    console.log(err);
     return err;
   } finally {
     if (connection) connection.release();
