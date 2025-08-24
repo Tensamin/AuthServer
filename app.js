@@ -15,7 +15,7 @@ let userCreations = [];
 let rpID = process.env.RPID || 'tensamin.methanium.net';
 let rpName = 'Tensamin';
 let primaryOrigin = process.env.ORIGIN || "https://tensamin.methanium.net";
-let allowedOrigins = new Set([primaryOrigin, 'app://-', 'null']);
+let allowedOrigins = new Set([primaryOrigin, 'app://dist', 'null']);
 
 let corsOptions = {
   origin: (incomingOrigin, callback) => {
