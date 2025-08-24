@@ -15,25 +15,40 @@ let userCreations = [];
 let rpID = process.env.RPID || 'tensamin.methanium.net';
 let rpName = 'Tensamin';
 let primaryOrigin = process.env.ORIGIN || "https://tensamin.methanium.net";
-let allowedOrigins = [
-    primaryOrigin,
-    'app://-',
-]
+let allowedOrigins = new Set([primaryOrigin, 'app://-', 'null']);
+
 let corsOptions = {
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error(`Not allowed by CORS policy for origin: ${origin}`), false);
-        };
-    },
-    credentials: true,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    allowedHeaders: 'Content-Type,Authorization',
+  origin: (incomingOrigin, callback) => {
+    try {
+      // debug/log the incoming origin so you can see what's sent
+      console.log('CORS incoming origin:', incomingOrigin);
+
+      // allow requests with no Origin header (curl, server-to-server, same-origin)
+      if (!incomingOrigin || allowedOrigins.has(incomingOrigin)) {
+        return callback(null, true);
+      }
+
+      // explicit deny
+      return callback(
+        new Error(
+          `Not allowed by CORS policy for origin: ${String(incomingOrigin)}`
+        ),
+        false
+      );
+    } catch (err) {
+      // catch any unexpected ReferenceError or other failures
+      console.error('CORS origin check failed:', err);
+      return callback(err, false);
+    }
+  },
+  credentials: true,
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  allowedHeaders: 'Content-Type,Authorization',
 };
 
 // Environment
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: "16mb" }));
 app.use(express.urlencoded({ extended: true, limit: "16mb" }));
 
