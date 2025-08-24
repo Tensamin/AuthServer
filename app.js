@@ -43,7 +43,6 @@ let corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "16mb" }));
 app.use(express.urlencoded({ extended: true, limit: "16mb" }));
-app.options('(.*)', cors(corsOptions));
 
 // Helper Functions
 if (typeof globalThis.atob !== 'function') {
@@ -77,7 +76,6 @@ async function adjustAvatar(base64Input, bypass = false, quality = 80) {
 }
 
 function base64ToUint8Array(base64String) {
-    // Use Buffer directly to avoid relying on browser-only atob
     return Uint8Array.from(Buffer.from(base64String, 'base64'));
 }
 
