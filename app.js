@@ -15,22 +15,44 @@ let userCreations = [];
 let rpID = process.env.RPID || 'tensamin.methanium.net';
 let rpName = 'Tensamin';
 let primaryOrigin = process.env.ORIGIN || "https://tensamin.methanium.net";
-let allowedOrigins = [primaryOrigin, 'app://-'];
+let allowedOrigins = new Set([primaryOrigin, 'app://-', 'null']);
+
+let corsOptions = {
+  origin: (incomingOrigin, callback) => {
+    try {
+      // debug/log the incoming origin so you can see what's sent
+      console.log('CORS incoming origin:', incomingOrigin);
+
+      // allow requests with no Origin header (curl, server-to-server, same-origin)
+      if (!incomingOrigin || allowedOrigins.has(incomingOrigin)) {
+        return callback(null, true);
+      }
+
+      // explicit deny
+      return callback(
+        new Error(
+          `Not allowed by CORS policy for origin: ${String(incomingOrigin)}`
+        ),
+        false
+      );
+    } catch (err) {
+      // catch any unexpected ReferenceError or other failures
+      console.error('CORS origin check failed:', err);
+      return callback(err, false);
+    }
+  },
+  credentials: true,
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  allowedHeaders: 'Content-Type,Authorization',
+};
 
 // Environment
-app.use(cors({ credentials: true }));
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: "16mb" }));
 app.use(express.urlencoded({ extended: true, limit: "16mb" }));
 
 // Helper Functions
-if (typeof globalThis.atob !== 'function') {
-    globalThis.atob = (b64) => Buffer.from(b64, 'base64').toString('utf-8');
-};
-
-if (typeof globalThis.btoa !== 'function') {
-    globalThis.btoa = (str) => Buffer.from(String(str), 'utf-8').toString('base64');
-};
-
 async function adjustAvatar(base64Input, bypass = false, quality = 80) {
     if (bypass) {
         return base64Input;
@@ -54,7 +76,14 @@ async function adjustAvatar(base64Input, bypass = false, quality = 80) {
 }
 
 function base64ToUint8Array(base64String) {
-    return Uint8Array.from(Buffer.from(base64String, 'base64'));
+    let binaryString = atob(base64String);
+    let len = binaryString.length;
+    let bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    return bytes;
 }
 
 function isBase64(str) {
@@ -703,7 +732,7 @@ app.post('/api/delete/:uuid', async (req, res) => {
 // Omikron Endpoints
 app.get('/api/get/private-key-hash/:uuid', async (req, res) => {
     let uuid = req.params.uuid;
-
+    
     try {
         if (req.headers.authorization && req.headers.privatekeyhash) {
             let isLegitOmikron = await db.checkLegitimacy(req.headers.authorization)
