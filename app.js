@@ -20,15 +20,10 @@ let allowedOrigins = new Set([primaryOrigin, 'app://-', 'null']);
 let corsOptions = {
   origin: (incomingOrigin, callback) => {
     try {
-      // debug/log the incoming origin so you can see what's sent
-      console.log('CORS incoming origin:', incomingOrigin);
-
-      // allow requests with no Origin header (curl, server-to-server, same-origin)
       if (!incomingOrigin || allowedOrigins.has(incomingOrigin)) {
         return callback(null, true);
       }
 
-      // explicit deny
       return callback(
         new Error(
           `Not allowed by CORS policy for origin: ${String(incomingOrigin)}`
@@ -36,8 +31,6 @@ let corsOptions = {
         false
       );
     } catch (err) {
-      // catch any unexpected ReferenceError or other failures
-      console.error('CORS origin check failed:', err);
       return callback(err, false);
     }
   },
