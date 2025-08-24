@@ -14,10 +14,26 @@ let app = express();
 let userCreations = [];
 let rpID = process.env.RPID || 'tensamin.methanium.net';
 let rpName = 'Tensamin';
-let origin = process.env.ORIGIN || "https://tensamin.methanium.net";
+let primaryOrigin = process.env.ORIGIN || "https://tensamin.methanium.net";
+let allowedOrigins = [
+    primaryOrigin,
+    'app://-',
+]
+let corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error(`Not allowed by CORS policy for origin: ${origin}`), false);
+        };
+    },
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    allowedHeaders: 'Content-Type,Authorization',
+};
 
 // Environment
-app.use(cors({ origin: origin, credentials: true }));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "16mb" }));
 app.use(express.urlencoded({ extended: true, limit: "16mb" }));
 
