@@ -20,9 +20,22 @@ let allowedOrigins = new Set([primaryOrigin, 'app://dist', 'null']);
 let corsOptions = {
   origin: (incomingOrigin, callback) => {
     try {
-      if (!incomingOrigin || allowedOrigins.has(incomingOrigin)) {
+      if (!incomingOrigin) return callback(null, true);
+
+      if (allowedOrigins.has(incomingOrigin))
         return callback(null, true);
-      }
+
+      try {
+        const parsed = new URL(incomingOrigin);
+        const host = parsed.hostname;
+        if (
+          host === 'localhost' ||
+          host === '127.0.0.1' ||
+          host === '::1'
+        ) {
+          return callback(null, true);
+        }
+      } catch { }
 
       return callback(
         new Error(
