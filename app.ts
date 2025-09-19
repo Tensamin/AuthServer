@@ -96,6 +96,76 @@ async function adjustAvatar(
   }
 }
 
+// ---------- Shared small helpers to reduce duplication ----------
+function sendSuccess(
+  res: Response,
+  message: string,
+  log_level: number,
+  data?: Record<string, any>,
+  statusCode?: number
+): void {
+  const payload: any = {
+    type: "success",
+    log: { message, log_level },
+  };
+  if (data !== undefined) payload.data = data;
+  if (statusCode) res.status(statusCode).json(payload);
+  else res.json(payload);
+}
+
+function sendError(
+  res: Response,
+  message: string,
+  log_level: number,
+  statusCode?: number
+): void {
+  const payload = {
+    type: "error",
+    log: { message, log_level },
+  };
+  if (statusCode) res.status(statusCode).json(payload);
+  else res.json(payload);
+}
+
+function hasKeys(obj: any, keys: string[]): boolean {
+  return keys.every((k) => Object.prototype.hasOwnProperty.call(obj, k));
+}
+
+function sanitizeUsername(s: string): string {
+  return s.toLowerCase().replaceAll(/[^a-z0-9_]/g, "");
+}
+
+function getCredentials(u: DbUser): Record<string, any> {
+  if (!u.credentials) return {};
+  if (typeof u.credentials === "string") {
+    if (u.credentials.trim().length === 0) return {};
+    try {
+      return JSON.parse(u.credentials);
+    } catch {
+      return {};
+    }
+  }
+  return (u.credentials ?? {}) as Record<string, any>;
+}
+
+function setCredentials(u: DbUser, creds: Record<string, any>): void {
+  u.credentials = JSON.stringify(creds);
+}
+
+async function updateUser(uuid: string, user: DbUser): Promise<void> {
+  normalizeCredentials(user);
+  unwrap(await db.update(uuid, toDbUpdate(user)));
+}
+
+async function ensureOmikronAuth(authHeader: unknown): Promise<boolean> {
+  if (typeof authHeader !== "string") return false;
+  return unwrap<boolean>(await db.checkLegitimacy(authHeader));
+}
+
+const ALL_TRANSPORTS: Array<
+  "internal" | "usb" | "nfc" | "smart-card" | "hybrid" | "cable" | "ble"
+> = ["internal", "usb", "nfc", "smart-card", "hybrid", "cable", "ble"];
+
 function base64ToUint8Array(base64String: string): Uint8Array {
   const buf = Buffer.from(base64String, "base64");
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
@@ -269,207 +339,147 @@ app.get("/api/get/:uuid", async (req: Request, res: Response) => {
 app.post("/api/change/username/:uuid", async (req: Request, res: Response) => {
   const uuid = req.params.uuid;
   try {
-    if ("private_key_hash" in req.body && "username" in req.body) {
-      const user = unwrapGet(await db.get(uuid));
-      if (req.body.private_key_hash === user.private_key_hash) {
-        user.username = req.body.username
-          .toLowerCase()
-          .replaceAll(/[^a-z0-9_]/g, "");
-        normalizeCredentials(user);
-        unwrap(await db.update(uuid, toDbUpdate(user)));
-        res.json({
-          type: "success",
-          log: {
-            message: "Changed username",
-            log_level: 0,
-          },
-        });
-      } else throw new Error("Permission Denied");
-    } else throw new Error("Missing Values");
+    if (!hasKeys(req.body, ["private_key_hash", "username"]))
+      throw new Error("Missing Values");
+    const user = unwrapGet(await db.get(uuid));
+    if (req.body.private_key_hash !== user.private_key_hash)
+      throw new Error("Permission Denied");
+
+    user.username = sanitizeUsername(String(req.body.username));
+    await updateUser(uuid, user);
+    sendSuccess(res, "Changed username", 0);
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to change username: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 0,
-      },
-    });
+    sendError(
+      res,
+      `Failed to change username: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      0
+    );
   }
 });
 
 app.post("/api/change/display/:uuid", async (req: Request, res: Response) => {
   const uuid = req.params.uuid;
   try {
-    if ("private_key_hash" in req.body && "display" in req.body) {
-      const user = unwrapGet(await db.get(uuid));
-      if (req.body.private_key_hash === user.private_key_hash) {
-        if (req.body.display === "...") throw new Error("Name not allowed");
+    if (!hasKeys(req.body, ["private_key_hash", "display"]))
+      throw new Error("Missing Values");
+    const user = unwrapGet(await db.get(uuid));
+    if (req.body.private_key_hash !== user.private_key_hash)
+      throw new Error("Permission Denied");
+    if (req.body.display === "...") throw new Error("Name not allowed");
 
-        user.display = req.body.display;
-        normalizeCredentials(user);
-        unwrap(await db.update(uuid, toDbUpdate(user)));
-        res.json({
-          type: "success",
-          log: {
-            message: "Changed display",
-            log_level: 0,
-          },
-        });
-      } else throw new Error("Permission Denied");
-    } else throw new Error("Missing Values");
+    user.display = req.body.display;
+    await updateUser(uuid, user);
+    sendSuccess(res, "Changed display", 0);
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to change display: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 0,
-      },
-    });
+    sendError(
+      res,
+      `Failed to change display: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      0
+    );
   }
 });
 
 app.post("/api/change/avatar/:uuid", async (req: Request, res: Response) => {
   const uuid = req.params.uuid;
   try {
-    if ("private_key_hash" in req.body && "avatar" in req.body) {
-      const user = unwrapGet(await db.get(uuid));
-      if (req.body.private_key_hash === user.private_key_hash) {
-        user.avatar = await adjustAvatar(
-          req.body.avatar,
-          (user.sub_level ?? 0) >= 1
-        );
-        normalizeCredentials(user);
-        unwrap(await db.update(uuid, toDbUpdate(user)));
-        res.json({
-          type: "success",
-          log: {
-            message: "Changed avatar",
-            log_level: 0,
-          },
-        });
-      } else throw new Error("Permission Denied");
-    } else throw new Error("Missing Values");
+    if (!hasKeys(req.body, ["private_key_hash", "avatar"]))
+      throw new Error("Missing Values");
+    const user = unwrapGet(await db.get(uuid));
+    if (req.body.private_key_hash !== user.private_key_hash)
+      throw new Error("Permission Denied");
+    user.avatar = await adjustAvatar(
+      req.body.avatar,
+      (user.sub_level ?? 0) >= 1
+    );
+    await updateUser(uuid, user);
+    sendSuccess(res, "Changed avatar", 0);
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to change avatar: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 0,
-      },
-    });
+    sendError(
+      res,
+      `Failed to change avatar: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      0
+    );
   }
 });
 
 app.post("/api/change/about/:uuid", async (req: Request, res: Response) => {
   const uuid = req.params.uuid;
   try {
-    if ("private_key_hash" in req.body && "about" in req.body) {
-      const user = unwrapGet(await db.get(uuid));
-      if (req.body.private_key_hash === user.private_key_hash) {
-        if (isBase64(req.body.about)) {
-          user.about = req.body.about;
-        } else {
-          user.about = btoa(String(req.body.about));
-        }
-        normalizeCredentials(user);
-        unwrap(await db.update(uuid, toDbUpdate(user)));
-        res.json({
-          type: "success",
-          log: {
-            message: "Changed about",
-            log_level: 0,
-          },
-        });
-      } else throw new Error("Permission Denied");
-    } else throw new Error("Missing Values");
+    if (!hasKeys(req.body, ["private_key_hash", "about"]))
+      throw new Error("Missing Values");
+    const user = unwrapGet(await db.get(uuid));
+    if (req.body.private_key_hash !== user.private_key_hash)
+      throw new Error("Permission Denied");
+    user.about = isBase64(req.body.about)
+      ? req.body.about
+      : btoa(String(req.body.about));
+    await updateUser(uuid, user);
+    sendSuccess(res, "Changed about", 0);
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to change about: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 0,
-      },
-    });
+    sendError(
+      res,
+      `Failed to change about: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      0
+    );
   }
 });
 
 app.post("/api/change/status/:uuid", async (req: Request, res: Response) => {
   const uuid = req.params.uuid;
   try {
-    if ("private_key_hash" in req.body && "status" in req.body) {
-      const user = unwrapGet(await db.get(uuid));
-      if (req.body.private_key_hash === user.private_key_hash) {
-        user.status = req.body.status;
-        normalizeCredentials(user);
-        unwrap(await db.update(uuid, toDbUpdate(user)));
-        res.json({
-          type: "success",
-          log: {
-            message: "Changed status",
-            log_level: 0,
-          },
-        });
-      } else throw new Error("Permission Denied");
-    } else throw new Error("Missing Values");
+    if (!hasKeys(req.body, ["private_key_hash", "status"]))
+      throw new Error("Missing Values");
+    const user = unwrapGet(await db.get(uuid));
+    if (req.body.private_key_hash !== user.private_key_hash)
+      throw new Error("Permission Denied");
+    user.status = req.body.status;
+    await updateUser(uuid, user);
+    sendSuccess(res, "Changed status", 0);
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to change status: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 0,
-      },
-    });
+    sendError(
+      res,
+      `Failed to change status: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      0
+    );
   }
 });
 
 app.post("/api/change/iota-id/:uuid", async (req: Request, res: Response) => {
   const uuid = req.params.uuid;
   try {
-    if (
-      "reset_token" in req.body &&
-      "new_token" in req.body &&
-      "iota_id" in req.body
-    ) {
-      const user = unwrapGet(await db.get(uuid));
-      if (req.body.reset_token === user.token) {
-        user.iota_id = req.body.iota_id;
-        user.token = req.body.new_token;
-        normalizeCredentials(user);
-        unwrap(await db.update(uuid, toDbUpdate(user)));
-        res.json({
-          type: "success",
-          log: {
-            message: "Changed iota id",
-            log_level: 0,
-          },
-        });
-      } else throw new Error("Permission Denied");
-    } else
+    if (!hasKeys(req.body, ["reset_token", "new_token", "iota_id"]))
       throw new Error(
-        `Missing Values, got: ${"reset_token" in req.body && "Reset Token"} ${
-          "new_token" in req.body && "New Token"
-        } ${"iota_id" in req.body && "Iota ID"}`
+        `Missing Values, got: ${
+          ("reset_token" in req.body && "Reset Token") || ""
+        } ${("new_token" in req.body && "New Token") || ""} ${
+          ("iota_id" in req.body && "Iota ID") || ""
+        }`
       );
+    const user = unwrapGet(await db.get(uuid));
+    if (req.body.reset_token !== user.token)
+      throw new Error("Permission Denied");
+    user.iota_id = req.body.iota_id;
+    user.token = req.body.new_token;
+    await updateUser(uuid, user);
+    sendSuccess(res, "Changed iota id", 0);
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to change iota id: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 0,
-      },
-    });
+    sendError(
+      res,
+      `Failed to change iota id: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      0
+    );
   }
 });
 
@@ -477,37 +487,30 @@ app.post("/api/change/keys/:uuid", async (req: Request, res: Response) => {
   const uuid = req.params.uuid;
   try {
     if (
-      "reset_token" in req.body &&
-      "new_token" in req.body &&
-      "private_key_hash" in req.body &&
-      "public_key" in req.body
-    ) {
-      const user = unwrapGet(await db.get(uuid));
-      if (req.body.reset_token === user.token) {
-        user.private_key_hash = req.body.private_key_hash;
-        user.public_key = req.body.public_key;
-        user.token = req.body.new_token;
-        normalizeCredentials(user);
-        unwrap(await db.update(uuid, toDbUpdate(user)));
-        res.json({
-          type: "success",
-          log: {
-            message: "Changed keys",
-            log_level: 0,
-          },
-        });
-      } else throw new Error("Permission Denied");
-    } else throw new Error("Missing Values");
+      !hasKeys(req.body, [
+        "reset_token",
+        "new_token",
+        "private_key_hash",
+        "public_key",
+      ])
+    )
+      throw new Error("Missing Values");
+    const user = unwrapGet(await db.get(uuid));
+    if (req.body.reset_token !== user.token)
+      throw new Error("Permission Denied");
+    user.private_key_hash = req.body.private_key_hash;
+    user.public_key = req.body.public_key;
+    user.token = req.body.new_token;
+    await updateUser(uuid, user);
+    sendSuccess(res, "Changed keys", 0);
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to change keys: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 0,
-      },
-    });
+    sendError(
+      res,
+      `Failed to change keys: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      0
+    );
   }
 });
 
@@ -516,47 +519,38 @@ app.post("/api/register/options/:uuid", async (req: Request, res: Response) => {
 
   try {
     const user = unwrapGet(await db.get(uuid));
-    if (req.body.private_key_hash === user.private_key_hash) {
-      let options = await generateRegistrationOptions({
-        rpName,
-        rpID,
-        userName: user.username ?? "user",
-        userDisplayName: user.display ?? user.username ?? "user",
-        attestationType: "none",
-        authenticatorSelection: {
-          userVerification: "preferred",
-        },
-        supportedAlgorithmIDs: [-7, -257],
-      });
+    if (req.body.private_key_hash !== user.private_key_hash)
+      throw new Error("Permission Denied");
 
-      if (!user.lambda) {
-        user.lambda = randomBytes(128).toString("base64");
-      }
-      user.current_challenge = options.challenge;
-      normalizeCredentials(user);
-      unwrap(await db.update(uuid, toDbUpdate(user)));
-
-      res.json({
-        type: "success",
-        log: {
-          message: "Got registration options",
-          log_level: 2,
-        },
-        data: {
-          options: btoa(JSON.stringify(options)),
-        },
-      });
-    } else throw new Error("Permission Denied");
-  } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to get registration options: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 2,
+    let options = await generateRegistrationOptions({
+      rpName,
+      rpID,
+      userName: user.username ?? "user",
+      userDisplayName: user.display ?? user.username ?? "user",
+      attestationType: "none",
+      authenticatorSelection: {
+        userVerification: "preferred",
       },
+      supportedAlgorithmIDs: [-7, -257],
     });
+
+    if (!user.lambda) {
+      user.lambda = randomBytes(128).toString("base64");
+    }
+    user.current_challenge = options.challenge;
+    await updateUser(uuid, user);
+
+    sendSuccess(res, "Got registration options", 2, {
+      options: btoa(JSON.stringify(options)),
+    });
+  } catch (err) {
+    sendError(
+      res,
+      `Failed to get registration options: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      2
+    );
   }
 });
 
@@ -592,29 +586,13 @@ app.post("/api/register/verify/:uuid", async (req: Request, res: Response) => {
     }
 
     let { credential } = registrationInfo!;
-
     let { id, publicKey, counter, transports } = credential;
 
     if (!id || !publicKey) {
       throw new Error("Missing credential data");
     }
 
-    const creds: Record<string, any> = ((): Record<string, any> => {
-      if (!user.credentials) return {};
-      if (
-        typeof user.credentials === "string" &&
-        user.credentials.trim().length > 0
-      ) {
-        try {
-          return JSON.parse(user.credentials);
-        } catch {
-          return {};
-        }
-      }
-      if (typeof user.credentials === "object")
-        return user.credentials as Record<string, any>;
-      return {};
-    })();
+    const creds = getCredentials(user);
 
     creds[id] = {
       id,
@@ -626,30 +604,16 @@ app.post("/api/register/verify/:uuid", async (req: Request, res: Response) => {
     let lambda = user.lambda;
 
     user.current_challenge = "";
-    user.credentials = JSON.stringify(creds);
-    normalizeCredentials(user);
-    unwrap(await db.update(uuid, toDbUpdate(user)));
+    setCredentials(user, creds);
+    await updateUser(uuid, user);
 
-    res.json({
-      type: "success",
-      log: {
-        message: "Verified",
-        log_level: 2,
-      },
-      data: {
-        lambda,
-      },
-    });
+    sendSuccess(res, "Verified", 2, { lambda });
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to verify: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 2,
-      },
-    });
+    sendError(
+      res,
+      `Failed to verify: ${err instanceof Error ? err.message : String(err)}`,
+      2
+    );
   }
 });
 
@@ -659,17 +623,7 @@ app.get("/api/login/options/:uuid/:id", async (req: Request, res: Response) => {
 
   try {
     const user = unwrapGet(await db.get(uuid));
-    const creds: Record<string, any> = ((): Record<string, any> => {
-      if (!user.credentials) return {};
-      if (typeof user.credentials === "string") {
-        try {
-          return JSON.parse(user.credentials);
-        } catch {
-          return {};
-        }
-      }
-      return user.credentials as Record<string, any>;
-    })();
+    const creds = getCredentials(user);
     if (creds[cred_id] === undefined)
       throw new Error("Credential does not exist");
     const cred = creds[cred_id];
@@ -678,15 +632,7 @@ app.get("/api/login/options/:uuid/:id", async (req: Request, res: Response) => {
       allowCredentials: [
         {
           id: cred.id,
-          transports: [
-            "internal",
-            "usb",
-            "nfc",
-            "smart-card",
-            "hybrid",
-            "cable",
-            "ble",
-          ],
+          transports: ALL_TRANSPORTS,
         },
       ],
       userVerification: "required",
@@ -694,28 +640,18 @@ app.get("/api/login/options/:uuid/:id", async (req: Request, res: Response) => {
     });
 
     user.current_challenge = options.challenge;
-    normalizeCredentials(user);
-    unwrap(await db.update(uuid, toDbUpdate(user)));
-    res.json({
-      type: "success",
-      log: {
-        message: "Got login options",
-        log_level: 2,
-      },
-      data: {
-        options: btoa(JSON.stringify(options)),
-      },
+    await updateUser(uuid, user);
+    sendSuccess(res, "Got login options", 2, {
+      options: btoa(JSON.stringify(options)),
     });
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to get login options: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 2,
-      },
-    });
+    sendError(
+      res,
+      `Failed to get login options: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      2
+    );
   }
 });
 
@@ -734,17 +670,7 @@ app.post("/api/login/verify/:uuid/:id", async (req: Request, res: Response) => {
       throw new Error("Missing attestation in request body");
     }
 
-    const creds: Record<string, any> = ((): Record<string, any> => {
-      if (!user.credentials) return {};
-      if (typeof user.credentials === "string") {
-        try {
-          return JSON.parse(user.credentials);
-        } catch {
-          return {};
-        }
-      }
-      return user.credentials as Record<string, any>;
-    })();
+    const creds = getCredentials(user);
     if (creds === undefined) throw new Error("Credential does not exist");
     let cred = creds[cred_id];
 
@@ -776,31 +702,16 @@ app.post("/api/login/verify/:uuid/:id", async (req: Request, res: Response) => {
 
     creds[cred_id].counter = authenticationInfo!.newCounter;
     user.current_challenge = "";
-    user.credentials = JSON.stringify(creds);
+    setCredentials(user, creds);
+    await updateUser(uuid, user);
 
-    normalizeCredentials(user);
-    unwrap(await db.update(uuid, toDbUpdate(user)));
-
-    res.json({
-      type: "success",
-      log: {
-        message: "Verified",
-        log_level: 2,
-      },
-      data: {
-        lambda,
-      },
-    });
+    sendSuccess(res, "Verified", 2, { lambda });
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to verify: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 2,
-      },
-    });
+    sendError(
+      res,
+      `Failed to verify: ${err instanceof Error ? err.message : String(err)}`,
+      2
+    );
   }
 });
 
@@ -837,9 +748,7 @@ app.post("/api/register/complete", async (req: Request, res: Response) => {
       "iota_id" in req.body &&
       "reset_token" in req.body
     ) {
-      let newUsername = req.body.username
-        .toLowerCase()
-        .replaceAll(/[^a-z0-9_]/g, "");
+      let newUsername = sanitizeUsername(String(req.body.username));
 
       if (userCreations.includes(req.body.uuid)) {
         db.add(
@@ -856,39 +765,16 @@ app.post("/api/register/complete", async (req: Request, res: Response) => {
           if (idx >= 0) userCreations.splice(idx, 1);
         }
       } else {
-        res.status(400).json({
-          type: "error",
-          log: {
-            message: "User creation failed do to invalid UUID",
-            log_level: 1,
-          },
-        });
+        sendError(res, "User creation failed do to invalid UUID", 1, 400);
+        return;
       }
       // Success Message
-      res.json({
-        type: "success",
-        log: {
-          message: `Created User: ${req.body.uuid}`,
-          log_level: 0,
-        },
-      });
+      sendSuccess(res, `Created User: ${req.body.uuid}`, 0);
     } else {
-      res.status(400).json({
-        type: "error",
-        log: {
-          message: "User creation failed do to missing values",
-          log_level: 1,
-        },
-      });
+      sendError(res, "User creation failed do to missing values", 1, 400);
     }
   } catch (err) {
-    res.status(500).json({
-      type: "error",
-      log: {
-        message: err instanceof Error ? err.message : String(err),
-        log_level: 1,
-      },
-    });
+    sendError(res, err instanceof Error ? err.message : String(err), 1, 500);
   }
 });
 
@@ -898,31 +784,12 @@ app.post("/api/delete/:uuid", async (req: Request, res: Response) => {
   try {
     if ("reset_token" in req.body) {
       unwrap(await db.remove(uuid, req.body.reset_token));
-
-      res.json({
-        type: "success",
-        log: {
-          message: `Deleted User: ${uuid}`,
-          log_level: 0,
-        },
-      });
+      sendSuccess(res, `Deleted User: ${uuid}`, 0);
     } else {
-      res.status(400).json({
-        type: "error",
-        log: {
-          message: "User creation failed do to missing values",
-          log_level: 1,
-        },
-      });
+      sendError(res, "User creation failed do to missing values", 1, 400);
     }
   } catch (err) {
-    res.status(500).json({
-      type: "error",
-      log: {
-        message: err instanceof Error ? err.message : String(err),
-        log_level: 1,
-      },
-    });
+    sendError(res, err instanceof Error ? err.message : String(err), 1, 500);
   }
 });
 
@@ -937,34 +804,23 @@ app.get(
         typeof req.headers.authorization === "string" &&
         typeof req.headers.privatekeyhash === "string"
       ) {
-        let isLegitOmikron = await db.checkLegitimacy(
-          req.headers.authorization
-        );
+        let isLegitOmikron = await ensureOmikronAuth(req.headers.authorization);
         if (isLegitOmikron) {
           const user = unwrapGet(await db.get(uuid));
           const { private_key_hash } = user as any;
-          res.json({
-            type: "success",
-            log: {
-              message: "Got private key hash",
-              log_level: 1,
-            },
-            data: {
-              matches: req.headers.privatekeyhash === private_key_hash,
-            },
+          sendSuccess(res, "Got private key hash", 1, {
+            matches: req.headers.privatekeyhash === private_key_hash,
           });
         } else throw new Error("Permission Denied");
       } else throw new Error("Permission Denied");
     } catch (err) {
-      res.json({
-        type: "error",
-        log: {
-          message: `Failed to get private key hash: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-          log_level: 1,
-        },
-      });
+      sendError(
+        res,
+        `Failed to get private key hash: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+        1
+      );
     }
   }
 );
@@ -973,32 +829,21 @@ app.get("/api/get/iota-id/:uuid", async (req: Request, res: Response) => {
   const uuid = req.params.uuid;
   try {
     if (typeof req.headers.authorization === "string") {
-      let isLegitOmikron = await db.checkLegitimacy(req.headers.authorization);
+      let isLegitOmikron = await ensureOmikronAuth(req.headers.authorization);
       if (isLegitOmikron) {
         const user = unwrapGet(await db.get(uuid));
         const { iota_id } = user as any;
-        res.json({
-          type: "success",
-          log: {
-            message: "Got iota id",
-            log_level: 1,
-          },
-          data: {
-            iota_id,
-          },
-        });
+        sendSuccess(res, "Got iota id", 1, { iota_id });
       } else throw new Error("Permission Denied");
     } else throw new Error("Permission Denied");
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to get private key hash: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 1,
-      },
-    });
+    sendError(
+      res,
+      `Failed to get private key hash: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      1
+    );
   }
 });
 
