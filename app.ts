@@ -3,7 +3,7 @@ import express, { Request, Response } from "express";
 import cors, { CorsOptions } from "cors";
 import sharp from "sharp";
 import { v7 } from "uuid";
-import * as db from "./db";
+import * as db from "./db.ts";
 import "dotenv/config";
 import { randomBytes } from "crypto";
 import {
