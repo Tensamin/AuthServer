@@ -5,9 +5,9 @@
   "license": "custom",
   "author": "Methanium",
   "type": "module",
-  "main": "app.js",
+  "main": "app.ts",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.ts"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.1.2",
