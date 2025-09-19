@@ -1,13 +1,15 @@
-import mysql, {
+// Imports
+import mysql from "mysql2/promise";
+import "dotenv/config";
+import * as schedule from "node-schedule";
+
+// Types
+import type {
   Pool,
   RowDataPacket,
   PoolConnection,
   ResultSetHeader,
 } from "mysql2/promise";
-import "dotenv/config";
-import * as schedule from "node-schedule";
-
-let pool: Pool | null = null;
 
 interface User {
   uuid?: string;
@@ -27,6 +29,9 @@ interface User {
   current_challenge?: string;
   credentials?: string;
 }
+
+// Database Pool
+let pool: Pool | null = null;
 
 // Helper Functions
 function isValidColName(name: string): boolean {

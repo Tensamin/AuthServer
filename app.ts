@@ -1,6 +1,6 @@
 // Imports
-import express, { Request, Response } from "express";
-import cors, { CorsOptions } from "cors";
+import express from "express";
+import cors from "cors";
 import sharp from "sharp";
 import { v7 } from "uuid";
 import * as db from "./db.ts";
@@ -12,6 +12,10 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
+
+// Types
+import type { CorsOptions } from "cors";
+import type { Request, Response } from "express";
 
 // Variables
 const port: number = Number(process.env.PORT) || 9187;
