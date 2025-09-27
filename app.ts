@@ -471,6 +471,7 @@ app.post("/api/change/iota-id/:uuid", async (req: Request, res: Response) => {
     user.iota_id = req.body.iota_id;
     user.token = req.body.new_token;
     await updateUser(uuid, user);
+    console.log("Updated iota id for user:", uuid);
     sendSuccess(res, "Changed iota id", 0);
   } catch (err) {
     sendError(
