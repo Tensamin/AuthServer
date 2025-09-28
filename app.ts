@@ -371,7 +371,7 @@ app.post("/api/change/:uuid", async (req: Request, res: Response) => {
     });
 
     await updateUser(uuid, user);
-    sendSuccess(res, "Changed user", 0);
+    sendSuccess(res, "Changed user", 0, user);
   } catch (err) {
     sendError(
       res,
