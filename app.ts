@@ -224,7 +224,9 @@ app.get("/api/get/:uuid", async (req: Request, res: Response) => {
         created_at,
         username,
         display,
-        avatar: `data:image/webp;base64,${avatar.toString("base64")}`,
+        avatar: avatar
+          ? `data:image/webp;base64,${avatar.toString("base64")}`
+          : null,
         about,
         status,
         public_key,
