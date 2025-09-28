@@ -266,7 +266,7 @@ export async function get(uuid: string): Promise<User | null | Error> {
 
 export async function update(
   uuid: string,
-  data: Partial<User>
+  data: User
 ): Promise<boolean | Error> {
   let connection: PoolConnection | null = null;
   try {

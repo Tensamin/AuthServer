@@ -278,7 +278,6 @@ app.post("/api/change/:uuid", async (req: Request, res: Response) => {
             (user.sub_level ?? 0) >= 1
           );
           user[key] = avatar;
-          console.log(avatar);
           break;
       }
     });
