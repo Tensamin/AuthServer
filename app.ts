@@ -63,13 +63,15 @@ app.use(express.urlencoded({ extended: true, limit: "16mb" }));
 // Helper Functions
 async function adjustAvatar(
   base64Input: string,
-  bypass = false,
-  quality = 80
+  bypass: boolean
 ): Promise<string> {
+  const quality = 80;
   if (bypass) {
+    console.log("Bypass", base64Input);
     return base64Input;
   }
   try {
+    console.log("Compress", base64Input);
     let base64Data = base64Input.split(";base64,").pop();
     if (!base64Data) {
       throw new Error("Invalid base64 input string.");
@@ -81,13 +83,13 @@ async function adjustAvatar(
     let compressedBase64 = `data:image/webp;base64,${compressedBuffer.toString(
       "base64"
     )}`;
+    console.log("Compressed", compressedBase64);
     return compressedBase64;
   } catch (err) {
     throw err instanceof Error ? err : new Error(String(err));
   }
 }
 
-// ---------- Shared small helpers to reduce duplication ----------
 function sendSuccess(
   res: Response,
   message: string,
