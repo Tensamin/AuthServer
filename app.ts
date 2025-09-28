@@ -65,25 +65,20 @@ async function adjustAvatar(
   base64Input: string,
   bypass: boolean
 ): Promise<string> {
-  const quality = 80;
-  if (bypass) {
-    console.log("Bypass", base64Input);
-    return base64Input;
-  }
+  const quality = bypass ? 100 : 30;
   try {
-    console.log("Compress", base64Input);
     let base64Data = base64Input.split(";base64,").pop();
     if (!base64Data) {
       throw new Error("Invalid base64 input string.");
     }
     let inputBuffer = Buffer.from(base64Data, "base64");
     let compressedBuffer = await sharp(inputBuffer)
-      .webp({ quality })
+      .resize({ width: 450, height: 450, fit: "inside" })
+      .webp({ quality, effort: 6 })
       .toBuffer();
     let compressedBase64 = `data:image/webp;base64,${compressedBuffer.toString(
       "base64"
     )}`;
-    console.log("Compressed", compressedBase64);
     return compressedBase64;
   } catch (err) {
     throw err instanceof Error ? err : new Error(String(err));
@@ -278,10 +273,12 @@ app.post("/api/change/:uuid", async (req: Request, res: Response) => {
           user[key] = req.body[key];
           break;
         case "avatar":
-          user[key] = await adjustAvatar(
+          const avatar = await adjustAvatar(
             req.body[key],
             (user.sub_level ?? 0) >= 1
           );
+          user[key] = avatar;
+          console.log(avatar);
           break;
       }
     });
