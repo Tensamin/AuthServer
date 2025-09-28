@@ -1,5 +1,2 @@
 .env
 node_modules
-private.pem
-public.pem
-pnpm-lock.yaml

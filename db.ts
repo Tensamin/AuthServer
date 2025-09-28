@@ -11,7 +11,7 @@ import type {
   ResultSetHeader,
 } from "mysql2/promise";
 
-interface User {
+export type User = {
   uuid?: string;
   public_key: string;
   private_key_hash: string;
@@ -25,10 +25,7 @@ interface User {
   status?: string;
   sub_level: number;
   sub_end: number;
-  lambda?: string;
-  current_challenge?: string;
-  credentials?: string;
-}
+};
 
 // Database Pool
 let pool: Pool | null = null;
@@ -106,10 +103,7 @@ async function createUsersTable(): Promise<void> {
       about VARCHAR(268),
       status VARCHAR(15),
       sub_level INT NOT NULL,
-      sub_end BIGINT NOT NULL,
-      lambda TEXT,
-      current_challenge TEXT,
-      credentials LONGTEXT
+      sub_end BIGINT NOT NULL
     );
   `;
   let connection: PoolConnection | null = null;
@@ -161,8 +155,8 @@ export async function add(
     connection = await pool.getConnection();
     await connection.execute(
       `
-    INSERT INTO users (uuid, public_key, private_key_hash, username, token, iota_id, created_at, display, avatar, about, status, sub_level, sub_end, lambda, current_challenge, credentials)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,?, ?, ?, ? , ?, ?);
+    INSERT INTO users (uuid, public_key, private_key_hash, username, token, iota_id, created_at, display, avatar, about, status, sub_level, sub_end)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,?, ?, ?);
   `,
       [
         uuid,
@@ -178,9 +172,6 @@ export async function add(
         "",
         0,
         0,
-        "",
-        "",
-        "{}",
       ]
     );
     return "Created User";
@@ -249,7 +240,7 @@ export async function uuid(username: string): Promise<string | Error> {
   }
 }
 
-export async function get(uuid: string): Promise<Partial<User> | null | Error> {
+export async function get(uuid: string): Promise<User | null | Error> {
   let connection: PoolConnection | null = null;
   try {
     if (!pool) throw new Error("Database not initialized");
@@ -265,7 +256,7 @@ export async function get(uuid: string): Promise<Partial<User> | null | Error> {
 
     // Remove uuid from the result before returning
     delete row.uuid;
-    return row as Partial<User>;
+    return row;
   } catch (err) {
     return err instanceof Error ? err : new Error(String(err));
   } finally {
