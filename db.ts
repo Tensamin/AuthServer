@@ -20,7 +20,7 @@ export type User = {
   username: string;
   created_at: number;
   display?: string;
-  avatar?: string;
+  avatar?: Buffer;
   about?: string;
   status?: string;
   sub_level: number;
@@ -99,7 +99,7 @@ async function createUsersTable(): Promise<void> {
       username VARCHAR(15) NOT NULL UNIQUE,
       created_at BIGINT NOT NULL,
       display VARCHAR(15),
-      avatar MEDIUMTEXT,
+      avatar MEDIUMBLOB,
       about VARCHAR(268),
       status VARCHAR(15),
       sub_level INT NOT NULL,

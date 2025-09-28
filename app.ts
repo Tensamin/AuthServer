@@ -64,22 +64,20 @@ app.use(express.urlencoded({ extended: true, limit: "16mb" }));
 async function adjustAvatar(
   base64Input: string,
   bypass: boolean
-): Promise<string> {
+): Promise<Buffer> {
   const quality = bypass ? 100 : 30;
+
   try {
-    let base64Data = base64Input.split(";base64,").pop();
+    const base64Data = base64Input.split(";base64,").pop();
     if (!base64Data) {
       throw new Error("Invalid base64 input string.");
     }
-    let inputBuffer = Buffer.from(base64Data, "base64");
-    let compressedBuffer = await sharp(inputBuffer)
+    const inputBuffer = Buffer.from(base64Data, "base64");
+    const compressedBuffer = await sharp(inputBuffer)
       .resize({ width: 450, height: 450, fit: "inside" })
       .webp({ quality, effort: 6 })
       .toBuffer();
-    let compressedBase64 = `data:image/webp;base64,${compressedBuffer.toString(
-      "base64"
-    )}`;
-    return compressedBase64;
+    return compressedBuffer;
   } catch (err) {
     throw err instanceof Error ? err : new Error(String(err));
   }
@@ -226,7 +224,7 @@ app.get("/api/get/:uuid", async (req: Request, res: Response) => {
         created_at,
         username,
         display,
-        avatar,
+        avatar: `data:image/webp;base64,${avatar.toString("base64")}`,
         about,
         status,
         public_key,
