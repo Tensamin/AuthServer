@@ -336,117 +336,46 @@ app.get("/api/get/:uuid", async (req: Request, res: Response) => {
   }
 });
 
-app.post("/api/change/username/:uuid", async (req: Request, res: Response) => {
+app.post("/api/change/:uuid", async (req: Request, res: Response) => {
   const uuid = req.params.uuid;
   try {
-    if (!hasKeys(req.body, ["private_key_hash", "username"]))
+    if (!hasKeys(req.body, ["private_key_hash"]))
       throw new Error("Missing Values");
     const user = unwrapGet(await db.get(uuid));
     if (req.body.private_key_hash !== user.private_key_hash)
       throw new Error("Permission Denied");
 
-    user.username = sanitizeUsername(String(req.body.username));
+    Object.keys(req.body).forEach(async (key) => {
+      switch (key) {
+        case "username":
+          user[key] = sanitizeUsername(req.body[key]);
+          break;
+        case "display":
+          user[key] = req.body[key];
+          break;
+        case "about":
+          user[key] = isBase64(req.body[key])
+            ? req.body[key]
+            : btoa(String(req.body[key]));
+          break;
+        case "status":
+          user[key] = req.body[key];
+          break;
+        case "avatar":
+          user[key] = await adjustAvatar(
+            req.body[key],
+            (user.sub_level ?? 0) >= 1
+          );
+          break;
+      }
+    });
+
     await updateUser(uuid, user);
-    sendSuccess(res, "Changed username", 0);
+    sendSuccess(res, "Changed user", 0);
   } catch (err) {
     sendError(
       res,
-      `Failed to change username: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-      0
-    );
-  }
-});
-
-app.post("/api/change/display/:uuid", async (req: Request, res: Response) => {
-  const uuid = req.params.uuid;
-  try {
-    if (!hasKeys(req.body, ["private_key_hash", "display"]))
-      throw new Error("Missing Values");
-    const user = unwrapGet(await db.get(uuid));
-    if (req.body.private_key_hash !== user.private_key_hash)
-      throw new Error("Permission Denied");
-    if (req.body.display === "...") throw new Error("Name not allowed");
-
-    user.display = req.body.display;
-    await updateUser(uuid, user);
-    sendSuccess(res, "Changed display", 0);
-  } catch (err) {
-    sendError(
-      res,
-      `Failed to change display: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-      0
-    );
-  }
-});
-
-app.post("/api/change/avatar/:uuid", async (req: Request, res: Response) => {
-  const uuid = req.params.uuid;
-  try {
-    if (!hasKeys(req.body, ["private_key_hash", "avatar"]))
-      throw new Error("Missing Values");
-    const user = unwrapGet(await db.get(uuid));
-    if (req.body.private_key_hash !== user.private_key_hash)
-      throw new Error("Permission Denied");
-    user.avatar = await adjustAvatar(
-      req.body.avatar,
-      (user.sub_level ?? 0) >= 1
-    );
-    await updateUser(uuid, user);
-    sendSuccess(res, "Changed avatar", 0);
-  } catch (err) {
-    sendError(
-      res,
-      `Failed to change avatar: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-      0
-    );
-  }
-});
-
-app.post("/api/change/about/:uuid", async (req: Request, res: Response) => {
-  const uuid = req.params.uuid;
-  try {
-    if (!hasKeys(req.body, ["private_key_hash", "about"]))
-      throw new Error("Missing Values");
-    const user = unwrapGet(await db.get(uuid));
-    if (req.body.private_key_hash !== user.private_key_hash)
-      throw new Error("Permission Denied");
-    user.about = isBase64(req.body.about)
-      ? req.body.about
-      : btoa(String(req.body.about));
-    await updateUser(uuid, user);
-    sendSuccess(res, "Changed about", 0);
-  } catch (err) {
-    sendError(
-      res,
-      `Failed to change about: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-      0
-    );
-  }
-});
-
-app.post("/api/change/status/:uuid", async (req: Request, res: Response) => {
-  const uuid = req.params.uuid;
-  try {
-    if (!hasKeys(req.body, ["private_key_hash", "status"]))
-      throw new Error("Missing Values");
-    const user = unwrapGet(await db.get(uuid));
-    if (req.body.private_key_hash !== user.private_key_hash)
-      throw new Error("Permission Denied");
-    user.status = req.body.status;
-    await updateUser(uuid, user);
-    sendSuccess(res, "Changed status", 0);
-  } catch (err) {
-    sendError(
-      res,
-      `Failed to change status: ${
+      `Failed to change user: ${
         err instanceof Error ? err.message : String(err)
       }`,
       0
