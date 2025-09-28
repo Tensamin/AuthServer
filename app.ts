@@ -4,6 +4,7 @@ import cors from "cors";
 import sharp from "sharp";
 import { v7 } from "uuid";
 import * as db from "./db.ts";
+import * as logger from "./logger.ts";
 import "dotenv/config";
 
 // Types
@@ -21,6 +22,8 @@ const allowedOrigins = new Set<string>([
   "app://dist",
   "http://localhost:3000",
 ]);
+
+await logger.initLogger();
 
 const corsOptions: CorsOptions = {
   origin: (
@@ -99,18 +102,41 @@ function sendSuccess(
   else res.json(payload);
 }
 
+type SendErrorOptions = {
+  statusCode?: number;
+  error?: unknown;
+  logMessage?: string;
+};
+
 function sendError(
   res: Response,
   message: string,
   log_level: number,
-  statusCode?: number
+  statusCodeOrOptions?: number | SendErrorOptions,
+  maybeError?: unknown
 ): void {
+  let statusCode: number | undefined;
+  let capturedError: unknown;
+  let logMessage: string | undefined;
+
+  if (typeof statusCodeOrOptions === "number") {
+    statusCode = statusCodeOrOptions;
+    capturedError = maybeError;
+  } else if (statusCodeOrOptions && typeof statusCodeOrOptions === "object") {
+    statusCode = statusCodeOrOptions.statusCode;
+    capturedError = statusCodeOrOptions.error;
+    logMessage = statusCodeOrOptions.logMessage;
+  }
+
   const payload = {
     type: "error",
     log: { message, log_level },
   };
+
   if (statusCode) res.status(statusCode).json(payload);
   else res.json(payload);
+
+  logger.logError(logMessage ?? message, capturedError);
 }
 
 function hasKeys(obj: any, keys: string[]): boolean {
@@ -187,14 +213,11 @@ app.get("/api/get/uuid/:username", async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to get uuid for ${username}: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 1,
-      },
+    const errorDetail = err instanceof Error ? err.message : String(err);
+    const clientMessage = "Failed to get uuid for supplied username";
+    sendError(res, `${clientMessage}: ${errorDetail}`, 1, {
+      error: err,
+      logMessage: clientMessage,
     });
   }
 });
@@ -235,14 +258,11 @@ app.get("/api/get/:uuid", async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    res.json({
-      type: "error",
-      log: {
-        message: `Failed to get user: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        log_level: 1,
-      },
+    const errorDetail = err instanceof Error ? err.message : String(err);
+    const clientMessage = "Failed to retrieve user profile";
+    sendError(res, `${clientMessage}: ${errorDetail}`, 1, {
+      error: err,
+      logMessage: clientMessage,
     });
   }
 });
@@ -285,13 +305,11 @@ app.post("/api/change/:uuid", async (req: Request, res: Response) => {
     await updateUser(uuid, user);
     sendSuccess(res, "Changed user", 0, user);
   } catch (err) {
-    sendError(
-      res,
-      `Failed to change user: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-      0
-    );
+    const errorDetail = err instanceof Error ? err.message : String(err);
+    sendError(res, `Failed to change user: ${errorDetail}`, 0, {
+      error: err,
+      logMessage: "Failed to change user",
+    });
   }
 });
 
@@ -315,13 +333,11 @@ app.post("/api/change/iota-id/:uuid", async (req: Request, res: Response) => {
     console.log("Updated iota id for user:", uuid);
     sendSuccess(res, "Changed iota id", 0);
   } catch (err) {
-    sendError(
-      res,
-      `Failed to change iota id: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-      0
-    );
+    const errorDetail = err instanceof Error ? err.message : String(err);
+    sendError(res, `Failed to change iota id: ${errorDetail}`, 0, {
+      error: err,
+      logMessage: "Failed to change iota id",
+    });
   }
 });
 
@@ -346,13 +362,11 @@ app.post("/api/change/keys/:uuid", async (req: Request, res: Response) => {
     await updateUser(uuid, user);
     sendSuccess(res, "Changed keys", 0);
   } catch (err) {
-    sendError(
-      res,
-      `Failed to change keys: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-      0
-    );
+    const errorDetail = err instanceof Error ? err.message : String(err);
+    sendError(res, `Failed to change keys: ${errorDetail}`, 0, {
+      error: err,
+      logMessage: "Failed to change keys",
+    });
   }
 });
 
@@ -415,7 +429,13 @@ app.post("/api/register/complete", async (req: Request, res: Response) => {
       sendError(res, "User creation failed do to missing values", 1, 400);
     }
   } catch (err) {
-    sendError(res, err instanceof Error ? err.message : String(err), 1, 500);
+    const errorDetail = err instanceof Error ? err.message : String(err);
+    const clientMessage = "User registration failed";
+    sendError(res, `${clientMessage}: ${errorDetail}`, 1, {
+      statusCode: 500,
+      error: err,
+      logMessage: clientMessage,
+    });
   }
 });
 
@@ -430,7 +450,13 @@ app.post("/api/delete/:uuid", async (req: Request, res: Response) => {
       sendError(res, "User creation failed do to missing values", 1, 400);
     }
   } catch (err) {
-    sendError(res, err instanceof Error ? err.message : String(err), 1, 500);
+    const errorDetail = err instanceof Error ? err.message : String(err);
+    const clientMessage = "User deletion failed";
+    sendError(res, `${clientMessage}: ${errorDetail}`, 1, {
+      statusCode: 500,
+      error: err,
+      logMessage: clientMessage,
+    });
   }
 });
 
@@ -455,13 +481,12 @@ app.get(
         } else throw new Error("Permission Denied");
       } else throw new Error("Permission Denied");
     } catch (err) {
-      sendError(
-        res,
-        `Failed to get private key hash: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        1
-      );
+      const errorDetail = err instanceof Error ? err.message : String(err);
+      const clientMessage = "Failed to get private key hash";
+      sendError(res, `${clientMessage}: ${errorDetail}`, 1, {
+        error: err,
+        logMessage: clientMessage,
+      });
     }
   }
 );
@@ -478,13 +503,12 @@ app.get("/api/get/iota-id/:uuid", async (req: Request, res: Response) => {
       } else throw new Error("Permission Denied");
     } else throw new Error("Permission Denied");
   } catch (err) {
-    sendError(
-      res,
-      `Failed to get private key hash: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-      1
-    );
+    const errorDetail = err instanceof Error ? err.message : String(err);
+    const clientMessage = "Failed to get iota id";
+    sendError(res, `${clientMessage}: ${errorDetail}`, 1, {
+      error: err,
+      logMessage: clientMessage,
+    });
   }
 });
 
@@ -500,6 +524,10 @@ app.listen(port, async () => {
 process.on("SIGINT", db.close);
 process.on("SIGTERM", db.close);
 process.on("uncaughtException", async (err: unknown) => {
-  console.error("Uncaught Exception:", err);
+  logger.logError("Uncaught exception", err);
   await db.close();
+});
+
+process.on("unhandledRejection", (reason: unknown) => {
+  logger.logError("Unhandled promise rejection", reason);
 });
