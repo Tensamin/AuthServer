@@ -303,7 +303,12 @@ app.post("/api/change/:uuid", async (req: Request, res: Response) => {
     }
 
     await updateUser(uuid, user);
-    sendSuccess(res, "Changed user", 0, user);
+    sendSuccess(res, "Changed user", 0, {
+      ...user,
+      avatar: user.avatar
+        ? `data:image/webp;base64,${user.avatar.toString("base64")}`
+        : null,
+    });
   } catch (err) {
     const errorDetail = err instanceof Error ? err.message : String(err);
     sendError(res, `Failed to change user: ${errorDetail}`, 0, {
