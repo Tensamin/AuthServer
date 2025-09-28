@@ -276,31 +276,31 @@ app.post("/api/change/:uuid", async (req: Request, res: Response) => {
     if (req.body.private_key_hash !== user.private_key_hash)
       throw new Error("Permission Denied");
 
-    Object.keys(req.body).forEach(async (key) => {
+    for (const key of Object.keys(req.body)) {
       switch (key) {
         case "username":
-          user[key] = sanitizeUsername(req.body[key]);
+          user.username = sanitizeUsername(req.body.username);
           break;
         case "display":
-          user[key] = req.body[key];
+          user.display = req.body.display;
           break;
         case "about":
-          user[key] = isBase64(req.body[key])
-            ? req.body[key]
-            : btoa(String(req.body[key]));
+          user.about = isBase64(req.body.about)
+            ? req.body.about
+            : btoa(String(req.body.about));
           break;
         case "status":
-          user[key] = req.body[key];
+          user.status = req.body.status;
           break;
-        case "avatar":
-          const avatar = await adjustAvatar(
-            req.body[key],
+        case "avatar": {
+          user.avatar = await adjustAvatar(
+            req.body.avatar,
             (user.sub_level ?? 0) >= 1
           );
-          user[key] = avatar;
           break;
+        }
       }
-    });
+    }
 
     await updateUser(uuid, user);
     sendSuccess(res, "Changed user", 0, user);

@@ -2,6 +2,9 @@
 import mysql from "mysql2/promise";
 import "dotenv/config";
 import * as schedule from "node-schedule";
+import * as logger from "./logger.ts";
+
+await logger.initLogger();
 
 // Types
 import type {
@@ -54,9 +57,12 @@ function prepareUpdateEntries(
   }
 
   let setExpr = entries.map(([k]) => `\`${k}\` = ?`).join(", ");
-  let values = entries.map(([, v]) =>
-    v === null ? null : typeof v === "object" ? JSON.stringify(v) : v
-  );
+  let values = entries.map(([, v]) => {
+    if (v === null) return null;
+    if (Buffer.isBuffer(v)) return v;
+    if (typeof v === "object") return JSON.stringify(v);
+    return v;
+  });
 
   return { setExpr, values };
 }
@@ -83,7 +89,7 @@ export async function init(): Promise<void> {
     await createOmikronUUIDsTable();
     console.log("Database pool initialized.");
   } catch (err) {
-    console.error("Failed to initialize database pool:", err);
+    logger.logError("Failed to initialize database pool", err);
     throw new Error("Database initialization failed.");
   }
 }
@@ -112,7 +118,7 @@ async function createUsersTable(): Promise<void> {
     connection = await pool.getConnection();
     await connection.execute(createTableQuery);
   } catch (err) {
-    console.error("Error creating users table:", err);
+    logger.logError("Error creating users table", err);
     throw err;
   } finally {
     if (connection) connection.release();
@@ -133,7 +139,7 @@ async function createOmikronUUIDsTable(): Promise<void> {
     connection = await pool.getConnection();
     await connection.execute(createOmikronUUIDsTableQuery);
   } catch (err) {
-    console.error("Error creating omikron_uuids table:", err);
+    logger.logError("Error creating omikron_uuids table", err);
     throw err;
   } finally {
     if (connection) connection.release();
@@ -363,7 +369,7 @@ WHERE sub_end = 0;`,
       if (connection) connection.release();
     }
   } catch (err) {
-    console.error(err);
+    logger.logError("Failed to decrement subscriptions", err);
   }
 }
 
@@ -382,5 +388,5 @@ try {
   }
 } catch (e) {
   const msg = e instanceof Error ? e.message : String(e);
-  console.warn("Scheduler setup failed:", msg);
+  logger.logError("Scheduler setup failed", msg);
 }
