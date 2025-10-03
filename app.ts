@@ -68,6 +68,9 @@ async function adjustAvatar(
   base64Input: string,
   bypass: boolean
 ): Promise<Buffer> {
+  if (!base64Input || base64Input === "")
+    return Promise.resolve(Buffer.alloc(0));
+
   const quality = bypass ? 100 : 30;
 
   try {
@@ -293,10 +296,6 @@ app.post("/api/change/:uuid", async (req: Request, res: Response) => {
           user.status = req.body.status;
           break;
         case "avatar": {
-          if (req.body.avatar === "") {
-            user.avatar = undefined;
-            break;
-          }
           user.avatar = await adjustAvatar(
             req.body.avatar,
             (user.sub_level ?? 0) >= 1
