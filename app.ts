@@ -240,6 +240,7 @@ app.get("/api/get/:uuid", async (req: Request, res: Response) => {
       sub_level,
       sub_end,
     } = u as any;
+    console.log(`Avatar: "${avatar}"`)
     res.json({
       type: "success",
       log: {
