@@ -23,7 +23,7 @@ export type User = {
   username: string;
   created_at: number;
   display?: string;
-  avatar?: Buffer;
+  avatar?: Buffer | null;
   about?: string;
   status?: string;
   sub_level: number;

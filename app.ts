@@ -67,9 +67,8 @@ app.use(express.urlencoded({ extended: true, limit: "16mb" }));
 async function adjustAvatar(
   base64Input: string,
   bypass: boolean
-): Promise<Buffer> {
-  if (!base64Input || base64Input === "")
-    return Promise.resolve(Buffer.alloc(0));
+): Promise<Buffer | null> {
+  if (!base64Input || base64Input === "") return null;
 
   const quality = bypass ? 100 : 30;
 
@@ -250,10 +249,9 @@ app.get("/api/get/:uuid", async (req: Request, res: Response) => {
         created_at,
         username,
         display,
-        avatar:
-          avatar !== null && avatar !== ""
-            ? `data:image/webp;base64,${avatar.toString("base64")}`
-            : null,
+        avatar: avatar
+          ? `data:image/webp;base64,${avatar.toString("base64")}`
+          : null,
         about,
         status,
         public_key,
