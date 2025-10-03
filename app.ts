@@ -293,10 +293,14 @@ app.post("/api/change/:uuid", async (req: Request, res: Response) => {
           user.status = req.body.status;
           break;
         case "avatar": {
-          user.avatar = await adjustAvatar(
-            req.body.avatar,
-            (user.sub_level ?? 0) >= 1
-          );
+          if (req.body.avatar === "") {
+            user.avatar = undefined;
+          } else {
+            user.avatar = await adjustAvatar(
+              req.body.avatar,
+              (user.sub_level ?? 0) >= 1
+            );
+          }
           break;
         }
       }
