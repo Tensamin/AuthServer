@@ -295,12 +295,12 @@ app.post("/api/change/:uuid", async (req: Request, res: Response) => {
         case "avatar": {
           if (req.body.avatar === "") {
             user.avatar = undefined;
-          } else {
-            user.avatar = await adjustAvatar(
-              req.body.avatar,
-              (user.sub_level ?? 0) >= 1
-            );
+            break;
           }
+          user.avatar = await adjustAvatar(
+            req.body.avatar,
+            (user.sub_level ?? 0) >= 1
+          );
           break;
         }
       }
