@@ -8,7 +8,7 @@ export function hasKeys(obj: unknown, keys: string[]): obj is JsonRecord {
 }
 
 export function sanitizeUsername(value: string): string {
-  return value.toLowerCase().replaceAll(/[^a-z0-9_]/g, "");
+  return value.toLowerCase().replace(/[^a-z0-9_]/g, "");
 }
 
 export function avatarToDataUri(
