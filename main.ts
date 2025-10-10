@@ -190,7 +190,7 @@ const handler: Deno.ServeHandler = async (request) => {
   try {
     if (request.method === "GET") {
       if (pathname.startsWith("/api/get/uuid/")) {
-        const match = pathname.match(/^\/api\/get\/uuid\/([0-9a-fA-F-]{36})\/?$/);
+        const match = pathname.match(/^\/api\/get\/uuid\/([^/]+)$/);
         if (!match) {
           return sendError(origin, "Invalid username path", 1, { status: 400 });
         }
@@ -217,7 +217,7 @@ const handler: Deno.ServeHandler = async (request) => {
       }
 
       if (pathname.startsWith("/api/get/")) {
-        const match = pathname.match(/^\/api\/get\/([0-9a-fA-F-]{36})\/?$/);
+        const match = pathname.match(/^\/api\/get\/([^/]+)$/);
         if (!match) {
           return sendError(origin, "Invalid user path", 1, { status: 400 });
         }
@@ -275,9 +275,7 @@ const handler: Deno.ServeHandler = async (request) => {
       }
 
       if (pathname.startsWith("/api/get/private-key-hash/")) {
-        const match = pathname.match(
-          /^\/api\/get\/private-key-hash\/([0-9a-fA-F-]{36})\/?$/
-        );
+        const match = pathname.match(/^\/api\/get\/private-key-hash\/([^/]+)$/);
         if (!match) {
           return sendError(origin, "Invalid user path", 1, { status: 400 });
         }
@@ -311,7 +309,7 @@ const handler: Deno.ServeHandler = async (request) => {
       }
 
       if (pathname.startsWith("/api/get/iota-id/")) {
-        const match = pathname.match(/^\/api\/get\/iota-id\/([0-9a-fA-F-]{36})\/?$/);
+        const match = pathname.match(/^\/api\/get\/iota-id\/([^/]+)$/);
         if (!match) {
           return sendError(origin, "Invalid user path", 1, { status: 400 });
         }
@@ -341,7 +339,7 @@ const handler: Deno.ServeHandler = async (request) => {
 
     if (request.method === "POST") {
       if (pathname.startsWith("/api/change/iota-id/")) {
-        const match = pathname.match(/^\/api\/change\/iota-id\/([0-9a-fA-F-]{36})\/?$/);
+        const match = pathname.match(/^\/api\/change\/iota-id\/([^/]+)$/);
         if (!match) {
           return sendError(origin, "Invalid user path", 1, { status: 400 });
         }
@@ -375,7 +373,7 @@ const handler: Deno.ServeHandler = async (request) => {
       }
 
       if (pathname.startsWith("/api/change/keys/")) {
-        const match = pathname.match(/^\/api\/change\/keys\/([0-9a-fA-F-]{36})\/?$/);
+        const match = pathname.match(/^\/api\/change\/keys\/([^/]+)$/);
         if (!match) {
           return sendError(origin, "Invalid user path", 1, { status: 400 });
         }
@@ -416,7 +414,7 @@ const handler: Deno.ServeHandler = async (request) => {
       }
 
       if (pathname.startsWith("/api/change/")) {
-        const match = pathname.match(/^\/api\/change\/([0-9a-fA-F-]{36})\/?$/);
+        const match = pathname.match(/^\/api\/change\/([^/]+)$/);
         if (!match) {
           return sendError(origin, "Invalid user path", 1, { status: 400 });
         }
@@ -522,7 +520,7 @@ const handler: Deno.ServeHandler = async (request) => {
       }
 
       if (pathname.startsWith("/api/delete/")) {
-        const match = pathname.match(/^\/api\/delete\/([0-9a-fA-F-]{36})\/?$/);
+        const match = pathname.match(/^\/api\/delete\/([^/]+)$/);
         if (!match) {
           return sendError(origin, "Invalid user path", 1, { status: 400 });
         }
