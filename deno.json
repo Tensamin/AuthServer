@@ -7,7 +7,7 @@
     "@std/dotenv": "jsr:@std/dotenv@0.224",
     "@std/encoding/base64": "jsr:@std/encoding@1/base64",
     "@std/uuid": "jsr:@std/uuid@1",
-    "mysql": "https://deno.land/x/mysql@v2.12.1/mod.ts",
+    "mysql2/promise": "npm:mysql2@^2.3.3/promise",
     "sharp": "npm:sharp@0.33.4"
   }
 }

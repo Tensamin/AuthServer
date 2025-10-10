@@ -1,9 +1,14 @@
-import { Client, type ClientConfig, type ExecuteResult } from "mysql";
+import mysql, {
+  type Pool,
+  type PoolOptions,
+  type ResultSetHeader,
+  type RowDataPacket,
+} from "mysql2/promise";
 import { User } from "./types.ts";
 
 type PreparedEntries = { setExpr: string; values: unknown[] };
 
-let client: Client | null = null;
+let pool: Pool | null = null;
 let dailyTimeoutId: number | null = null;
 
 function isValidColName(name: string): boolean {
@@ -93,40 +98,46 @@ function normalizeUserRow(row: Record<string, unknown>): User {
   };
 }
 
-function ensureClient(): Client {
-  if (!client) {
+function ensurePool(): Pool {
+  if (!pool) {
     throw new Error("Database not initialized");
   }
-  return client;
+  return pool;
 }
 
 export async function init(): Promise<void> {
-  if (client) {
+  if (pool) {
     console.log("Database client already initialized.");
     return;
   }
 
   try {
-    const config: ClientConfig = {
-      hostname: Deno.env.get("DB_HOST") ?? "127.0.0.1",
-      username: ensureEnv("DB_USER"),
-      password: Deno.env.get("DB_PASSWD"),
-      db: ensureEnv("DB_NAME"),
+    const config: PoolOptions = {
+      host: Deno.env.get("DB_HOST") ?? "127.0.0.1",
+      user: ensureEnv("DB_USER"),
+      password: Deno.env.get("DB_PASSWD") ?? undefined,
+      database: ensureEnv("DB_NAME"),
       port: Number(Deno.env.get("DB_PORT") ?? "3306"),
-      poolSize: 10,
-      timeout: 30_000,
-      idleTimeout: 4 * 60 * 60 * 1000,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      connectTimeout: 30_000,
       charset: "utf8mb4",
     };
 
-    client = await new Client().connect(config);
+    pool = mysql.createPool(config);
 
     await createUsersTable();
     await createOmikronUUIDsTable();
     scheduleDailyJob();
     console.log("Database client initialized.");
   } catch (error) {
-    client = null;
+    if (pool) {
+      await pool.end().catch((closeError: unknown) => {
+        console.error("Failed to close pool after init error", closeError);
+      });
+      pool = null;
+    }
     console.error(error);
     throw new Error("Database initialization failed");
   }
@@ -152,7 +163,7 @@ async function createUsersTable(): Promise<void> {
   `;
 
   try {
-    await ensureClient().execute(sql);
+    await ensurePool().query(sql);
   } catch (error) {
     console.error(error);
     throw error;
@@ -169,7 +180,7 @@ async function createOmikronUUIDsTable(): Promise<void> {
   `;
 
   try {
-    await ensureClient().execute(sql);
+    await ensurePool().query(sql);
   } catch (error) {
     console.error(error);
     throw error;
@@ -186,7 +197,7 @@ export async function add(
   created_at: number
 ): Promise<string | Error> {
   try {
-    await ensureClient().execute(
+    const [result] = await ensurePool().execute<ResultSetHeader>(
       `
         INSERT INTO users (
           uuid, public_key, private_key_hash, username, token, iota_id,
@@ -209,7 +220,9 @@ export async function add(
         0,
       ]
     );
-    return "Created User";
+    return result.affectedRows === 1
+      ? "Created User"
+      : new Error("Insert failed");
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
   }
@@ -220,20 +233,21 @@ export async function remove(
   token: string
 ): Promise<string | Error> {
   try {
-    const rows = (await ensureClient().query(
+    const [rows] = await ensurePool().execute<RowDataPacket[]>(
       "SELECT token FROM users WHERE uuid = ?",
       [uuid]
-    )) as Array<{ token: string }>;
+    );
 
     if (rows.length === 0) {
       return new Error("UUID not found.");
     }
 
-    if (rows[0].token !== token) {
+    const row = rows[0] as RowDataPacket & { token: unknown };
+    if (row.token !== token) {
       return new Error("Bad Token");
     }
 
-    await ensureClient().execute("DELETE FROM users WHERE uuid = ?", [uuid]);
+    await ensurePool().execute("DELETE FROM users WHERE uuid = ?", [uuid]);
     return "Deleted User";
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
@@ -242,16 +256,17 @@ export async function remove(
 
 export async function uuid(username: string): Promise<string | Error> {
   try {
-    const rows = (await ensureClient().query(
+    const [rows] = await ensurePool().execute<RowDataPacket[]>(
       "SELECT uuid FROM users WHERE username = ?",
       [username]
-    )) as Array<{ uuid: string }>;
+    );
 
     if (rows.length === 0) {
       return new Error("UUID not found.");
     }
 
-    return rows[0].uuid;
+    const row = rows[0] as RowDataPacket & { uuid: unknown };
+    return String(row.uuid);
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
   }
@@ -259,14 +274,14 @@ export async function uuid(username: string): Promise<string | Error> {
 
 export async function get(uuid: string): Promise<User | null | Error> {
   try {
-    const rows = (await ensureClient().query(
+    const [rows] = await ensurePool().execute<RowDataPacket[]>(
       "SELECT * FROM users WHERE uuid = ?",
       [uuid]
-    )) as Array<Record<string, unknown>>;
+    );
 
-    const row = rows?.[0];
+    const row = rows?.[0] as RowDataPacket | undefined;
     if (!row) return null;
-    return normalizeUserRow(row);
+    return normalizeUserRow(row as Record<string, unknown>);
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
   }
@@ -283,10 +298,10 @@ export async function update(
     const { setExpr, values } = prepared;
     if (!setExpr) return false;
 
-    const result = (await ensureClient().execute(
+    const [result] = await ensurePool().execute<ResultSetHeader>(
       `UPDATE users SET ${setExpr} WHERE \`uuid\` = ?`,
       [...values, uuid]
-    )) as ExecuteResult;
+    );
 
     return (result.affectedRows ?? 0) > 0;
   } catch (error) {
@@ -296,16 +311,17 @@ export async function update(
 
 export async function checkLegitimacy(uuid: string): Promise<boolean | Error> {
   try {
-    const rows = (await ensureClient().query(
+    const [rows] = await ensurePool().execute<RowDataPacket[]>(
       "SELECT uuid FROM omikron_uuids WHERE uuid = ?",
       [uuid]
-    )) as Array<{ uuid: string }>;
+    );
 
     if (rows.length === 0) {
       return new Error("UUID not found.");
     }
 
-    return rows[0].uuid === uuid;
+    const row = rows[0] as RowDataPacket & { uuid: unknown };
+    return String(row.uuid) === uuid;
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
   }
@@ -317,9 +333,9 @@ export async function close(): Promise<void> {
     dailyTimeoutId = null;
   }
 
-  if (client) {
-    await client.close();
-    client = null;
+  if (pool) {
+    await pool.end();
+    pool = null;
     console.log("Database client closed.");
   }
 }
@@ -331,10 +347,10 @@ async function removeOneDayFromEverySubscription(): Promise<void> {
   );
 
   try {
-    await ensureClient().execute(
+    await ensurePool().execute(
       `UPDATE users SET sub_end = GREATEST(0, sub_end - 1);`
     );
-    await ensureClient().execute(
+    await ensurePool().execute(
       `UPDATE users SET sub_level = 0 WHERE sub_end = 0;`
     );
   } catch (error) {
