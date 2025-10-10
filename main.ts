@@ -27,6 +27,32 @@ const allowedOrigins = new Set<string>([
 
 const userCreations = new Set<string>();
 
+function toUserPayload(user: User): JsonRecord {
+  const {
+    created_at,
+    username,
+    display,
+    avatar,
+    about,
+    status,
+    public_key,
+    sub_level,
+    sub_end,
+  } = user;
+
+  return {
+    created_at,
+    username,
+    display,
+    avatar: avatarToDataUri(avatar),
+    about,
+    status,
+    public_key,
+    sub_level,
+    sub_end,
+  } satisfies JsonRecord;
+}
+
 function resolveCorsOrigin(request: Request): string | null {
   const origin = request.headers.get("Origin");
   if (!origin) return primaryOrigin;
@@ -194,25 +220,32 @@ const handler: Deno.ServeHandler = async (request) => {
         if (!match) {
           return sendError(origin, "Invalid username path", 1, { status: 400 });
         }
-        const username = decodeURIComponent(match[1]);
+        const identifier = decodeURIComponent(match[1]);
+        const identifierLooksLikeUuid = /^[0-9a-fA-F-]{36}$/.test(identifier);
         try {
-          const result = await db.uuid(username);
+          if (identifierLooksLikeUuid) {
+            return sendSuccess(origin, `Got user for ${identifier}`, 0, {
+              user_id: identifier,
+            });
+          }
+
+          const result = await db.uuid(identifier);
           const userUuid = unwrap<string>(result, "UUID lookup failed");
-          return sendSuccess(origin, `Got uuid for ${username}`, 0, {
+          return sendSuccess(origin, `Got uuid for ${identifier}`, 0, {
             user_id: userUuid,
           });
         } catch (error) {
           const message =
             error instanceof Error ? error.message : String(error);
-          return sendError(
-            origin,
-            `Failed to get uuid for supplied username: ${message}`,
-            1,
-            {
-              error,
-              logMessage: "Failed to get uuid for supplied username",
-            }
-          );
+          const errorContext = identifierLooksLikeUuid
+            ? `Failed to get user for supplied uuid: ${message}`
+            : `Failed to get uuid for supplied username: ${message}`;
+          return sendError(origin, errorContext, 1, {
+            error,
+            logMessage: identifierLooksLikeUuid
+              ? "Failed to get user for supplied uuid"
+              : "Failed to get uuid for supplied username",
+          });
         }
       }
 
@@ -224,29 +257,7 @@ const handler: Deno.ServeHandler = async (request) => {
         const userId = decodeURIComponent(match[1]);
         try {
           const user = unwrapGet(await db.get(userId), "User not found");
-          const {
-            created_at,
-            username,
-            display,
-            avatar,
-            about,
-            status,
-            public_key,
-            sub_level,
-            sub_end,
-          } = user;
-
-          return sendSuccess(origin, "Got user", 0, {
-            created_at,
-            username,
-            display,
-            avatar: avatarToDataUri(avatar),
-            about,
-            status,
-            public_key,
-            sub_level,
-            sub_end,
-          });
+          return sendSuccess(origin, "Got user", 0, toUserPayload(user));
         } catch (error) {
           const message =
             error instanceof Error ? error.message : String(error);
