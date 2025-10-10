@@ -286,7 +286,9 @@ const handler: Deno.ServeHandler = async (request) => {
       }
 
       if (pathname.startsWith("/api/get/private-key-hash/")) {
-        const match = pathname.match(/^\/api\/get\/private-key-hash\/([^/]+)$/);
+        const match = pathname.match(
+          /^\/api\/get\/private-key-hash\/([0-9a-fA-F-]{36})\/?$/
+        );
         if (!match) {
           return sendError(origin, "Invalid user path", 1, { status: 400 });
         }
