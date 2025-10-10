@@ -1,6 +1,6 @@
 // Imports
 import { load } from "@std/dotenv";
-import { decodeBase64, encodeBase64 } from "@std/encoding/base64";
+import { decodeBase64 } from "@std/encoding/base64";
 import { generate as generateUuidV7 } from "@std/uuid/unstable-v7";
 import sharp from "sharp";
 import { Buffer } from "node:buffer";
@@ -125,17 +125,6 @@ async function adjustAvatar(
     return new Uint8Array(processed);
   } catch (error) {
     throw error instanceof Error ? error : new Error(String(error));
-  }
-}
-
-function isBase64(value: unknown): boolean {
-  if (typeof value !== "string") return false;
-  if (value.trim().length === 0) return true;
-  try {
-    decodeBase64(value.trim());
-    return true;
-  } catch {
-    return false;
   }
 }
 
@@ -452,9 +441,7 @@ const handler: Deno.ServeHandler = async (request) => {
                 break;
               case "about":
                 user.about =
-                  typeof value === "string" && isBase64(value)
-                    ? value
-                    : encodeBase64(String(value));
+                  typeof value === "string" ? value : String(value ?? "");
                 break;
               case "status":
                 user.status = typeof value === "string" ? value : undefined;

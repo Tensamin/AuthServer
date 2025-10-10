@@ -147,18 +147,18 @@ async function createUsersTable(): Promise<void> {
   const sql = `
     CREATE TABLE IF NOT EXISTS users (
       uuid VARCHAR(36) NOT NULL PRIMARY KEY,
+      username VARCHAR(15) NOT NULL UNIQUE,
+      display VARCHAR(15),
+      status VARCHAR(15),
+      about VARCHAR(268),
+      created_at BIGINT NOT NULL,
+      avatar MEDIUMBLOB,
+      sub_level INT NOT NULL,
+      sub_end BIGINT NOT NULL,
       public_key TEXT NOT NULL,
       private_key_hash VARCHAR(64) NOT NULL,
       iota_id VARCHAR(36) NOT NULL,
-      token VARCHAR(256) NOT NULL UNIQUE,
-      username VARCHAR(15) NOT NULL UNIQUE,
-      created_at BIGINT NOT NULL,
-      display VARCHAR(15),
-      avatar MEDIUMBLOB,
-      about VARCHAR(268),
-      status VARCHAR(15),
-      sub_level INT NOT NULL,
-      sub_end BIGINT NOT NULL
+      token VARCHAR(256) NOT NULL UNIQUE
     );
   `;
 
