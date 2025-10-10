@@ -150,7 +150,7 @@ async function createUsersTable(): Promise<void> {
       username VARCHAR(15) NOT NULL UNIQUE,
       display VARCHAR(15),
       status VARCHAR(15),
-      about VARCHAR(268),
+      about VARCHAR(200),
       created_at BIGINT NOT NULL,
       avatar MEDIUMBLOB,
       sub_level INT NOT NULL,
