@@ -249,30 +249,6 @@ const handler: Deno.ServeHandler = async (request) => {
         }
       }
 
-      if (pathname.startsWith("/api/get/")) {
-        const match = pathname.match(/^\/api\/get\/([^/]+)$/);
-        if (!match) {
-          return sendError(origin, "Invalid user path", 1, { status: 400 });
-        }
-        const userId = decodeURIComponent(match[1]);
-        try {
-          const user = unwrapGet(await db.get(userId), "User not found");
-          return sendSuccess(origin, "Got user", 0, toUserPayload(user));
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          return sendError(
-            origin,
-            `Failed to retrieve user profile: ${message}`,
-            1,
-            {
-              error,
-              logMessage: "Failed to retrieve user profile",
-            }
-          );
-        }
-      }
-
       if (pathname === "/api/register/init") {
         const newUser = generateUuidV7();
         userCreations.add(newUser);
@@ -347,6 +323,29 @@ const handler: Deno.ServeHandler = async (request) => {
             logMessage: "Failed to get iota id",
           });
         }
+      }
+    }
+
+    if (pathname.startsWith("/api/get/")) {
+      const match = pathname.match(/^\/api\/get\/([^/]+)$/);
+      if (!match) {
+        return sendError(origin, "Invalid user path", 1, { status: 400 });
+      }
+      const userId = decodeURIComponent(match[1]);
+      try {
+        const user = unwrapGet(await db.get(userId), "User not found");
+        return sendSuccess(origin, "Got user", 0, toUserPayload(user));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return sendError(
+          origin,
+          `Failed to retrieve user profile: ${message}`,
+          1,
+          {
+            error,
+            logMessage: "Failed to retrieve user profile",
+          }
+        );
       }
     }
 
