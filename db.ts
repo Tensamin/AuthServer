@@ -1,101 +1,139 @@
-// Imports
-import mysql from "mysql2/promise";
-import "dotenv/config";
-import * as schedule from "node-schedule";
-import * as logger from "./logger.ts";
+import { Client, type ClientConfig, type ExecuteResult } from "mysql";
+import { User } from "./types.ts";
 
-await logger.initLogger();
+type PreparedEntries = { setExpr: string; values: unknown[] };
 
-// Types
-import type {
-  Pool,
-  RowDataPacket,
-  PoolConnection,
-  ResultSetHeader,
-} from "mysql2/promise";
+let client: Client | null = null;
+let dailyTimeoutId: number | null = null;
 
-export type User = {
-  uuid?: string;
-  public_key: string;
-  private_key_hash: string;
-  iota_id: string;
-  token: string;
-  username: string;
-  created_at: number;
-  display?: string;
-  avatar?: Buffer | null;
-  about?: string;
-  status?: string;
-  sub_level: number;
-  sub_end: number;
-};
-
-// Database Pool
-let pool: Pool | null = null;
-
-// Helper Functions
 function isValidColName(name: string): boolean {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
 }
 
 function prepareUpdateEntries(
   data: Partial<User>
-): { setExpr: string; values: any[] } | TypeError | Error {
+): PreparedEntries | TypeError | Error {
   if (!data || typeof data !== "object") {
     return new TypeError("data must be a non-null object");
   }
 
-  let entries = Object.entries(data).filter(([, v]) => v !== undefined);
+  const entries = Object.entries(data).filter(
+    ([, value]) => value !== undefined
+  );
   if (entries.length === 0) return { setExpr: "", values: [] };
 
-  for (let [k] of entries) {
-    if (!isValidColName(k)) {
+  for (const [column] of entries) {
+    if (!isValidColName(column)) {
       return new Error(
-        `Invalid column name: "${k}". Allowed: [A-Za-z_][A-Za-z0-9_]*`
+        `Invalid column name: "${column}". Allowed: [A-Za-z_][A-Za-z0-9_]*`
       );
     }
   }
 
-  let setExpr = entries.map(([k]) => `\`${k}\` = ?`).join(", ");
-  let values = entries.map(([, v]) => {
-    if (v === null) return null;
-    if (Buffer.isBuffer(v)) return v;
-    if (typeof v === "object") return JSON.stringify(v);
-    return v;
+  const setExpr = entries.map(([column]) => `\`${column}\` = ?`).join(", ");
+  const values = entries.map(([, value]) => {
+    if (value === null) return null;
+    if (value instanceof Uint8Array) return value;
+    if (typeof value === "object") return JSON.stringify(value);
+    return value;
   });
 
   return { setExpr, values };
 }
 
+function ensureEnv(name: string, fallback?: string): string {
+  const value = Deno.env.get(name) ?? fallback;
+  if (value === undefined) {
+    throw new Error(`Missing required environment variable ${name}`);
+  }
+  return value;
+}
+
+function toNumber(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "number") return value;
+  if (typeof value === "bigint") return Number(value);
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  return String(value);
+}
+
+function normalizeAvatar(value: unknown): Uint8Array | null {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer.slice(0));
+  }
+  if (typeof value === "string") {
+    return new TextEncoder().encode(value);
+  }
+  return null;
+}
+
+function normalizeUserRow(row: Record<string, unknown>): User {
+  return {
+    uuid: String(row.uuid),
+    public_key: String(row.public_key),
+    private_key_hash: String(row.private_key_hash),
+    iota_id: String(row.iota_id),
+    token: String(row.token),
+    username: String(row.username),
+    created_at: toNumber(row.created_at),
+    display: normalizeOptionalString(row.display),
+    avatar: normalizeAvatar(row.avatar),
+    about: normalizeOptionalString(row.about),
+    status: normalizeOptionalString(row.status),
+    sub_level: toNumber(row.sub_level),
+    sub_end: toNumber(row.sub_end),
+  };
+}
+
+function ensureClient(): Client {
+  if (!client) {
+    throw new Error("Database not initialized");
+  }
+  return client;
+}
+
 export async function init(): Promise<void> {
-  if (pool) {
-    console.log("Database pool already initialized.");
+  if (client) {
+    console.log("Database client already initialized.");
     return;
   }
 
   try {
-    pool = mysql.createPool({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWD,
-      database: process.env.DB_NAME,
-      port: parseInt(process.env.DB_PORT || "3306", 10),
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    });
+    const config: ClientConfig = {
+      hostname: Deno.env.get("DB_HOST") ?? "127.0.0.1",
+      username: ensureEnv("DB_USER"),
+      password: Deno.env.get("DB_PASSWD"),
+      db: ensureEnv("DB_NAME"),
+      port: Number(Deno.env.get("DB_PORT") ?? "3306"),
+      poolSize: 10,
+      timeout: 30_000,
+      idleTimeout: 4 * 60 * 60 * 1000,
+      charset: "utf8mb4",
+    };
+
+    client = await new Client().connect(config);
 
     await createUsersTable();
     await createOmikronUUIDsTable();
-    console.log("Database pool initialized.");
-  } catch (err) {
-    logger.logError("Failed to initialize database pool", err);
-    throw new Error("Database initialization failed.");
+    scheduleDailyJob();
+    console.log("Database client initialized.");
+  } catch (error) {
+    client = null;
+    console.error(error);
+    throw new Error("Database initialization failed");
   }
 }
 
 async function createUsersTable(): Promise<void> {
-  const createTableQuery = `
+  const sql = `
     CREATE TABLE IF NOT EXISTS users (
       uuid VARCHAR(36) NOT NULL PRIMARY KEY,
       public_key TEXT NOT NULL,
@@ -112,37 +150,29 @@ async function createUsersTable(): Promise<void> {
       sub_end BIGINT NOT NULL
     );
   `;
-  let connection: PoolConnection | null = null;
+
   try {
-    if (!pool) throw new Error("Database not initialized");
-    connection = await pool.getConnection();
-    await connection.execute(createTableQuery);
-  } catch (err) {
-    logger.logError("Error creating users table", err);
-    throw err;
-  } finally {
-    if (connection) connection.release();
+    await ensureClient().execute(sql);
+  } catch (error) {
+    console.error(error);
+    throw error;
   }
 }
 
 async function createOmikronUUIDsTable(): Promise<void> {
-  const createOmikronUUIDsTableQuery = `
+  const sql = `
     CREATE TABLE IF NOT EXISTS omikron_uuids (
       uuid VARCHAR(36) NOT NULL PRIMARY KEY UNIQUE,
       identification VARCHAR(255) NOT NULL,
       ip VARCHAR(45) NOT NULL
     );
   `;
-  let connection: PoolConnection | null = null;
+
   try {
-    if (!pool) throw new Error("Database not initialized");
-    connection = await pool.getConnection();
-    await connection.execute(createOmikronUUIDsTableQuery);
-  } catch (err) {
-    logger.logError("Error creating omikron_uuids table", err);
-    throw err;
-  } finally {
-    if (connection) connection.release();
+    await ensureClient().execute(sql);
+  } catch (error) {
+    console.error(error);
+    throw error;
   }
 }
 
@@ -155,15 +185,14 @@ export async function add(
   iota_id: string,
   created_at: number
 ): Promise<string | Error> {
-  let connection: PoolConnection | null = null;
   try {
-    if (!pool) throw new Error("Database not initialized");
-    connection = await pool.getConnection();
-    await connection.execute(
+    await ensureClient().execute(
       `
-    INSERT INTO users (uuid, public_key, private_key_hash, username, token, iota_id, created_at, display, avatar, about, status, sub_level, sub_end)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,?, ?, ?);
-  `,
+        INSERT INTO users (
+          uuid, public_key, private_key_hash, username, token, iota_id,
+          created_at, display, avatar, about, status, sub_level, sub_end
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `,
       [
         uuid,
         public_key,
@@ -173,7 +202,7 @@ export async function add(
         iota_id,
         created_at,
         "",
-        "",
+        null,
         "",
         "",
         0,
@@ -181,10 +210,8 @@ export async function add(
       ]
     );
     return "Created User";
-  } catch (err) {
-    return err instanceof Error ? err : new Error(String(err));
-  } finally {
-    if (connection) connection.release();
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
   }
 }
 
@@ -192,17 +219,11 @@ export async function remove(
   uuid: string,
   token: string
 ): Promise<string | Error> {
-  let connection: PoolConnection | null = null;
   try {
-    if (!pool) throw new Error("Database not initialized");
-    connection = await pool.getConnection();
-    interface TokenRow extends RowDataPacket {
-      token: string;
-    }
-    const [rows] = await connection.execute<TokenRow[]>(
+    const rows = (await ensureClient().query(
       "SELECT token FROM users WHERE uuid = ?",
       [uuid]
-    );
+    )) as Array<{ token: string }>;
 
     if (rows.length === 0) {
       return new Error("UUID not found.");
@@ -212,61 +233,42 @@ export async function remove(
       return new Error("Bad Token");
     }
 
-    await connection.execute("DELETE FROM users WHERE uuid = ?", [uuid]);
+    await ensureClient().execute("DELETE FROM users WHERE uuid = ?", [uuid]);
     return "Deleted User";
-  } catch (err) {
-    return err instanceof Error ? err : new Error(String(err));
-  } finally {
-    if (connection) connection.release();
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
   }
 }
 
 export async function uuid(username: string): Promise<string | Error> {
-  let connection: PoolConnection | null = null;
   try {
-    if (!pool) throw new Error("Database not initialized");
-    connection = await pool.getConnection();
-    interface UuidRow extends RowDataPacket {
-      uuid: string;
-    }
-    const [rows] = await connection.execute<UuidRow[]>(
-      `SELECT uuid FROM users WHERE username = ?;`,
+    const rows = (await ensureClient().query(
+      "SELECT uuid FROM users WHERE username = ?",
       [username]
-    );
+    )) as Array<{ uuid: string }>;
 
     if (rows.length === 0) {
       return new Error("UUID not found.");
     }
 
     return rows[0].uuid;
-  } catch (err) {
-    return err instanceof Error ? err : new Error(String(err));
-  } finally {
-    if (connection) connection.release();
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
   }
 }
 
 export async function get(uuid: string): Promise<User | null | Error> {
-  let connection: PoolConnection | null = null;
   try {
-    if (!pool) throw new Error("Database not initialized");
-    connection = await pool.getConnection();
-    type UserRow = RowDataPacket & User;
-    const [rows] = await connection.execute<UserRow[]>(
+    const rows = (await ensureClient().query(
       "SELECT * FROM users WHERE uuid = ?",
       [uuid]
-    );
+    )) as Array<Record<string, unknown>>;
 
     const row = rows?.[0];
     if (!row) return null;
-
-    // Remove uuid from the result before returning
-    delete row.uuid;
-    return row;
-  } catch (err) {
-    return err instanceof Error ? err : new Error(String(err));
-  } finally {
-    if (connection) connection.release();
+    return normalizeUserRow(row);
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
   }
 }
 
@@ -274,7 +276,6 @@ export async function update(
   uuid: string,
   data: User
 ): Promise<boolean | Error> {
-  let connection: PoolConnection | null = null;
   try {
     const prepared = prepareUpdateEntries(data);
     if (prepared instanceof Error) return prepared;
@@ -282,60 +283,44 @@ export async function update(
     const { setExpr, values } = prepared;
     if (!setExpr) return false;
 
-    const placeholderCount = (setExpr.match(/\?/g) || []).length;
-    if (placeholderCount !== values.length) {
-      return new Error(
-        `Placeholder/value mismatch: ${placeholderCount} placeholders ` +
-          `but ${values.length} values`
-      );
-    }
-
-    if (!pool) throw new Error("Database not initialized");
-    connection = await pool.getConnection();
-
-    const [result] = await connection.execute<ResultSetHeader>(
-      "UPDATE users SET " + setExpr + " WHERE `uuid` = ?",
+    const result = (await ensureClient().execute(
+      `UPDATE users SET ${setExpr} WHERE \`uuid\` = ?`,
       [...values, uuid]
-    );
-    return result.affectedRows > 0;
-  } catch (err) {
-    return err instanceof Error ? err : new Error(String(err));
-  } finally {
-    if (connection) connection.release();
+    )) as ExecuteResult;
+
+    return (result.affectedRows ?? 0) > 0;
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
   }
 }
 
 export async function checkLegitimacy(uuid: string): Promise<boolean | Error> {
-  let connection: PoolConnection | null = null;
   try {
-    if (!pool) throw new Error("Database not initialized");
-    connection = await pool.getConnection();
-    interface LegitRow extends RowDataPacket {
-      uuid: string;
-    }
-    const [rows] = await connection.execute<LegitRow[]>(
-      `SELECT uuid FROM omikron_uuids WHERE uuid = ?;`,
+    const rows = (await ensureClient().query(
+      "SELECT uuid FROM omikron_uuids WHERE uuid = ?",
       [uuid]
-    );
+    )) as Array<{ uuid: string }>;
 
     if (rows.length === 0) {
       return new Error("UUID not found.");
     }
 
     return rows[0].uuid === uuid;
-  } catch (err) {
-    return err instanceof Error ? err : new Error(String(err));
-  } finally {
-    if (connection) connection.release();
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
   }
 }
 
 export async function close(): Promise<void> {
-  if (pool) {
-    await pool.end();
-    console.log("Database connection pool closed.");
-    pool = null;
-    process.exit(0);
+  if (dailyTimeoutId !== null) {
+    clearTimeout(dailyTimeoutId);
+    dailyTimeoutId = null;
+  }
+
+  if (client) {
+    await client.close();
+    client = null;
+    console.log("Database client closed.");
   }
 }
 
@@ -344,49 +329,49 @@ async function removeOneDayFromEverySubscription(): Promise<void> {
   console.log(
     `Removed 1 day from all subscriptions at ${now.toISOString()} (local time: ${now.toLocaleString()}).`
   );
+
   try {
-    if (!pool) {
-      console.warn(
-        "Database not initialized; skipping subscription decrement job."
-      );
-      return;
-    }
-    let connection: PoolConnection | null = null;
-    try {
-      connection = await pool.getConnection();
-      await connection.execute(
-        `UPDATE users
-SET sub_end = GREATEST(0, sub_end - 1);`,
-        []
-      );
-      await connection.execute(
-        `UPDATE users
-SET sub_level = 0
-WHERE sub_end = 0;`,
-        []
-      );
-    } finally {
-      if (connection) connection.release();
-    }
-  } catch (err) {
-    logger.logError("Failed to decrement subscriptions", err);
+    await ensureClient().execute(
+      `UPDATE users SET sub_end = GREATEST(0, sub_end - 1);`
+    );
+    await ensureClient().execute(
+      `UPDATE users SET sub_level = 0 WHERE sub_end = 0;`
+    );
+  } catch (error) {
+    console.error("Failed to decrement subscriptions", error);
   }
 }
 
-let job: schedule.Job;
-try {
-  job = schedule.scheduleJob({ hour: 0, minute: 0 }, function () {
-    removeOneDayFromEverySubscription();
-  });
-  console.log("Node.js scheduler started.");
-  console.log("Job scheduled to run every day at 00:00 UTC.");
-  if (job && typeof job.nextInvocation === "function") {
-    const next = job.nextInvocation();
-    if (next instanceof Date) {
-      console.log("Next scheduled invocation:", next.toISOString());
+function scheduleDailyJob(): void {
+  try {
+    const now = new Date();
+    const next = new Date(now);
+    next.setUTCHours(0, 0, 0, 0);
+    if (next.getTime() <= now.getTime()) {
+      next.setUTCDate(next.getUTCDate() + 1);
     }
+
+    const kickoffDelay = next.getTime() - now.getTime();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+
+    const runJob = async () => {
+      try {
+        await removeOneDayFromEverySubscription();
+      } finally {
+        dailyTimeoutId = setTimeout(runJob, oneDayMs);
+      }
+    };
+
+    dailyTimeoutId = setTimeout(async () => {
+      try {
+        await runJob();
+      } catch (error) {
+        console.error("Error in scheduled daily job", error);
+      }
+    }, kickoffDelay);
+
+    console.log("Scheduler started. Job runs daily at 00:00 UTC.");
+  } catch (error) {
+    console.error("Failed to schedule daily job", error);
   }
-} catch (e) {
-  const msg = e instanceof Error ? e.message : String(e);
-  logger.logError("Scheduler setup failed", msg);
 }
