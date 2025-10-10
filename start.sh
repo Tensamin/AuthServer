@@ -1,1 +1,0 @@
-screen -S DevAuthServer deno task start
