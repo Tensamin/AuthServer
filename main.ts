@@ -1,5 +1,4 @@
 // Imports
-import "./polyfills.ts";
 import { load } from "@std/dotenv";
 import { decodeBase64, encodeBase64 } from "@std/encoding/base64";
 import { generate as generateUuidV7 } from "@std/uuid/unstable-v7";

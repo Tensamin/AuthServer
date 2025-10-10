@@ -1,4 +1,3 @@
-import "./polyfills.ts";
 import { Client, type ClientConfig, type ExecuteResult } from "mysql";
 import { User } from "./types.ts";
 
