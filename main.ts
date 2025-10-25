@@ -18,10 +18,9 @@ await load({ export: true, allowEmptyValues: true }).catch((error) => {
 await db.init();
 
 const port = Number(Deno.env.get("PORT") ?? "9187");
-const primaryOrigin = "https://tensamin.methanium.net";
+const primaryOrigin = "https://app.tensamin.net";
 const allowedOrigins = new Set<string>([
   primaryOrigin,
-  "app://dist",
   "http://localhost:3000",
 ]);
 
@@ -583,7 +582,7 @@ Deno.serve(
     port,
     onListen: ({ hostname, port }) => {
       console.log(
-        `> Started at http://${hostname}:${port} / https://auth-tensamin.methanium.net`
+        `> Started at http://${hostname}:${port} / https://auth.${primaryOrigin}`
       );
     },
   },
