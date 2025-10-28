@@ -1,6 +1,5 @@
-import { encodeBase64 } from "@std/encoding/base64";
-
-import { JsonRecord } from "./types.ts";
+import { Buffer } from "node:buffer";
+import type { JsonRecord } from "./types.ts";
 
 export function hasKeys(obj: unknown, keys: string[]): obj is JsonRecord {
   if (!obj || typeof obj !== "object") return false;
@@ -15,5 +14,5 @@ export function avatarToDataUri(
   avatar: Uint8Array | null | undefined
 ): string | null {
   if (!avatar) return null;
-  return `data:image/webp;base64,${encodeBase64(avatar)}`;
+  return `data:image/webp;base64,${Buffer.from(avatar).toString("base64")}`;
 }

@@ -1,15 +1,23 @@
+// Package Imports
 import mysql, {
   type Pool,
   type PoolOptions,
   type ResultSetHeader,
   type RowDataPacket,
 } from "mysql2/promise";
-import { User } from "./types.ts";
 
+// Lib Imports
+import type { User } from "./types.ts";
+
+// Main
 type PreparedEntries = { setExpr: string; values: unknown[] };
 
+if (typeof Bun === "undefined") {
+  throw new Error("The database layer requires the Bun runtime.");
+}
+
 let pool: Pool | null = null;
-let dailyTimeoutId: number | null = null;
+let dailyTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 function isValidColName(name: string): boolean {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
@@ -47,7 +55,7 @@ function prepareUpdateEntries(
 }
 
 function ensureEnv(name: string, fallback?: string): string {
-  const value = Deno.env.get(name) ?? fallback;
+  const value = Bun.env[name] ?? fallback;
   if (value === undefined) {
     throw new Error(`Missing required environment variable ${name}`);
   }
@@ -62,9 +70,29 @@ function toNumber(value: unknown): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function requireString(value: unknown, field: string): string {
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return value.toString();
+  }
+  throw new TypeError(`${field} must be a string`);
+}
+
 function normalizeOptionalString(value: unknown): string | undefined {
   if (value === null || value === undefined) return undefined;
-  return String(value);
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return value.toString();
+  }
+  return undefined;
 }
 
 function normalizeAvatar(value: unknown): Uint8Array | null {
@@ -82,12 +110,12 @@ function normalizeAvatar(value: unknown): Uint8Array | null {
 
 function normalizeUserRow(row: Record<string, unknown>): User {
   return {
-    uuid: String(row.uuid),
-    public_key: String(row.public_key),
-    private_key_hash: String(row.private_key_hash),
-    iota_id: String(row.iota_id),
-    token: String(row.token),
-    username: String(row.username),
+    uuid: requireString(row.uuid, "uuid"),
+    public_key: requireString(row.public_key, "public_key"),
+    private_key_hash: requireString(row.private_key_hash, "private_key_hash"),
+    iota_id: requireString(row.iota_id, "iota_id"),
+    token: requireString(row.token, "token"),
+    username: requireString(row.username, "username"),
     created_at: toNumber(row.created_at),
     display: normalizeOptionalString(row.display),
     avatar: normalizeAvatar(row.avatar),
@@ -113,11 +141,11 @@ export async function init(): Promise<void> {
 
   try {
     const config: PoolOptions = {
-      host: Deno.env.get("DB_HOST") ?? "127.0.0.1",
+      host: Bun.env.DB_HOST ?? "127.0.0.1",
       user: ensureEnv("DB_USER"),
-      password: Deno.env.get("DB_PASSWD") ?? undefined,
+      password: Bun.env.DB_PASSWD ?? undefined,
       database: ensureEnv("DB_NAME"),
-      port: Number(Deno.env.get("DB_PORT") ?? "3306"),
+      port: Number(Bun.env.DB_PORT ?? "3306"),
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
@@ -289,7 +317,7 @@ export async function get(uuid: string): Promise<User | null | Error> {
 
 export async function update(
   uuid: string,
-  data: User
+  data: Partial<User>
 ): Promise<boolean | Error> {
   try {
     const prepared = prepareUpdateEntries(data);
@@ -370,20 +398,28 @@ function scheduleDailyJob(): void {
     const kickoffDelay = next.getTime() - now.getTime();
     const oneDayMs = 24 * 60 * 60 * 1000;
 
+    const scheduleNextRun = () => {
+      dailyTimeoutId = setTimeout(() => {
+        void runJob();
+      }, oneDayMs);
+    };
+
     const runJob = async () => {
       try {
         await removeOneDayFromEverySubscription();
       } finally {
-        dailyTimeoutId = setTimeout(runJob, oneDayMs);
+        scheduleNextRun();
       }
     };
 
-    dailyTimeoutId = setTimeout(async () => {
-      try {
-        await runJob();
-      } catch (error) {
-        console.error("Error in scheduled daily job", error);
-      }
+    dailyTimeoutId = setTimeout(() => {
+      void (async () => {
+        try {
+          await runJob();
+        } catch (error) {
+          console.error("Error in scheduled daily job", error);
+        }
+      })();
     }, kickoffDelay);
 
     console.log("Scheduler started. Job runs daily at 00:00 UTC.");
