@@ -12,7 +12,7 @@
     "dotenv": "^16.4.5",
     "mysql2": "^3.9.4",
     "sharp": "^0.33.4",
-    "uuid": "^9.0.1"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.10.0",

@@ -1,6 +1,7 @@
 // Package Imports
 import { serve } from "bun";
 import { Buffer } from "node:buffer";
+import { v7 } from "uuid";
 import sharp from "sharp";
 
 // Lib Imports
@@ -44,40 +45,6 @@ function decodeBase64(input: string): Uint8Array {
   return new Uint8Array(Buffer.from(input, "base64"));
 }
 
-function generateUuidV7(): string {
-  let unixMs = Date.now();
-  const timeBytes = new Uint8Array(6);
-  for (let i = 5; i >= 0; i -= 1) {
-    timeBytes[i] = unixMs & 0xff;
-    unixMs >>>= 8;
-  }
-
-  const rand = crypto.getRandomValues(new Uint8Array(10));
-  const randA = ((rand[0] << 8) | rand[1]) & 0x0fff;
-
-  const bytes = new Uint8Array(16);
-  bytes.set(timeBytes, 0);
-  bytes[6] = 0x70 | (randA >>> 8);
-  bytes[7] = randA & 0xff;
-
-  bytes[8] = 0x80 | (rand[2] & 0x3f);
-  bytes[9] = rand[3];
-  bytes[10] = rand[4];
-  bytes[11] = rand[5];
-  bytes[12] = rand[6];
-  bytes[13] = rand[7];
-  bytes[14] = rand[8];
-  bytes[15] = rand[9];
-
-  const hex = Array.from(bytes, (octet) =>
-    octet.toString(16).padStart(2, "0")
-  ).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(
-    12,
-    16
-  )}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
 function toUserPayload(user: User): JsonRecord {
   const {
     created_at,
@@ -114,9 +81,7 @@ function resolveCorsOrigin(request: Request): string | null {
     if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
       return origin;
     }
-  } catch (error) {
-    console.error("Failed to parse CORS origin", error);
-  }
+  } catch {}
   return null;
 }
 
@@ -150,14 +115,11 @@ function buildJsonResponse(
 
 function sendSuccess(
   origin: string | null,
-  message: string,
-  logLevel: number,
   data?: JsonRecord,
   status = 200
 ): Response {
   const payload: JsonRecord = {
     type: "success",
-    log: { message, log_level: logLevel },
   };
   if (data !== undefined) {
     payload.data = data;
@@ -167,8 +129,6 @@ function sendSuccess(
 
 function sendError(
   origin: string | null,
-  message: string,
-  logLevel: number,
   options: {
     status?: number;
     error?: unknown;
@@ -176,10 +136,8 @@ function sendError(
   } = {}
 ): Response {
   const { status = 500, error, logMessage } = options;
-  console.error(logMessage ?? message, error);
   const payload = {
     type: "error",
-    log: { message, log_level: logLevel },
   };
   return buildJsonResponse(payload, origin, status);
 }
@@ -196,7 +154,11 @@ async function adjustAvatar(
     const base64Data = base64Input.split(";base64,").pop() ?? base64Input;
     const input = decodeBase64(base64Data);
     const processed = await sharp(Buffer.from(input))
-      .resize({ width: 450, height: 450, fit: "inside" })
+      .resize({
+        width: bypass ? 450 : 250,
+        height: bypass ? 450 : 250,
+        fit: "cover",
+      })
       .webp({ quality, effort: 6 })
       .toBuffer();
     return new Uint8Array(processed);
@@ -246,13 +208,13 @@ function splitPathSegments(pathname: string): string[] {
 }
 
 function handleRegisterInit(origin: string): Response {
-  const newUser = generateUuidV7();
+  const newUser = v7();
   userCreations.add(newUser);
   setTimeout(() => {
     userCreations.delete(newUser);
   }, 3_600_000);
 
-  return sendSuccess(origin, "Started user registration progress", 0, {
+  return sendSuccess(origin, {
     user_id: newUser,
   });
 }
@@ -288,7 +250,7 @@ async function handleGetResource(
   origin: string
 ): Promise<Response> {
   if (segments.length === 0) {
-    return sendError(origin, "Invalid user path", 1, { status: 400 });
+    return sendError(origin, { status: 400, logMessage: "Invalid user path" });
   }
 
   const [subResource, ...rest] = segments;
@@ -296,22 +258,34 @@ async function handleGetResource(
   switch (subResource) {
     case "uuid":
       if (rest.length !== 1) {
-        return sendError(origin, "Invalid username path", 1, { status: 400 });
+        return sendError(origin, {
+          status: 400,
+          logMessage: "Invalid username path",
+        });
       }
       return handleGetUuid(rest[0], origin);
     case "private-key-hash":
       if (rest.length !== 1) {
-        return sendError(origin, "Invalid user path", 1, { status: 400 });
+        return sendError(origin, {
+          status: 400,
+          logMessage: "Invalid user path",
+        });
       }
       return handleGetPrivateKeyHash(rest[0], request, origin);
     case "iota-id":
       if (rest.length !== 1) {
-        return sendError(origin, "Invalid user path", 1, { status: 400 });
+        return sendError(origin, {
+          status: 400,
+          logMessage: "Invalid user path",
+        });
       }
       return handleGetIotaId(rest[0], request, origin);
     default:
       if (rest.length !== 0) {
-        return sendError(origin, "Invalid user path", 1, { status: 400 });
+        return sendError(origin, {
+          status: 400,
+          logMessage: "Invalid user path",
+        });
       }
       return handleGetUserProfile(subResource, origin);
   }
@@ -326,26 +300,21 @@ async function handleGetUuid(
 
   try {
     if (identifierLooksLikeUuid) {
-      return sendSuccess(origin, `Got user for ${identifier}`, 0, {
+      return sendSuccess(origin, {
         user_id: identifier,
       });
     }
 
     const result = await db.uuid(identifier);
     const userUuid = unwrap<string>(result, "UUID lookup failed");
-    return sendSuccess(origin, `Got uuid for ${identifier}`, 0, {
+    return sendSuccess(origin, {
       user_id: userUuid,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const errorContext = identifierLooksLikeUuid
-      ? `Failed to get user for supplied uuid: ${message}`
-      : `Failed to get uuid for supplied username: ${message}`;
-    return sendError(origin, errorContext, 1, {
+    return sendError(origin, {
       error,
-      logMessage: identifierLooksLikeUuid
-        ? "Failed to get user for supplied uuid"
-        : "Failed to get uuid for supplied username",
+      logMessage: message,
     });
   }
 }
@@ -367,14 +336,14 @@ async function handleGetPrivateKeyHash(
     if (!isLegit) throw new Error("Permission Denied");
 
     const user = unwrapGet(await db.get(userId));
-    return sendSuccess(origin, "Got private key hash", 1, {
+    return sendSuccess(origin, {
       matches: privateKeyHash === user.private_key_hash,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return sendError(origin, `Failed to get private key hash: ${message}`, 1, {
+    return sendError(origin, {
       error,
-      logMessage: "Failed to get private key hash",
+      logMessage: message,
     });
   }
 }
@@ -395,14 +364,14 @@ async function handleGetIotaId(
     if (!isLegit) throw new Error("Permission Denied");
 
     const user = unwrapGet(await db.get(userId));
-    return sendSuccess(origin, "Got iota id", 1, {
+    return sendSuccess(origin, {
       iota_id: user.iota_id,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return sendError(origin, `Failed to get iota id: ${message}`, 1, {
+    return sendError(origin, {
       error,
-      logMessage: "Failed to get iota id",
+      logMessage: message,
     });
   }
 }
@@ -415,12 +384,12 @@ async function handleGetUserProfile(
 
   try {
     const user = unwrapGet(await db.get(userId), "User not found");
-    return sendSuccess(origin, "Got user", 0, toUserPayload(user));
+    return sendSuccess(origin, toUserPayload(user));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return sendError(origin, `Failed to retrieve user profile: ${message}`, 1, {
+    return sendError(origin, {
       error,
-      logMessage: "Failed to retrieve user profile",
+      logMessage: message,
     });
   }
 }
@@ -457,21 +426,27 @@ async function handleChangeRoutes(
   origin: string
 ): Promise<Response> {
   if (segments.length === 0) {
-    return sendError(origin, "Invalid user path", 1, { status: 400 });
+    return sendError(origin, { status: 400, logMessage: "Invalid user path" });
   }
 
   const [subResource, ...rest] = segments;
 
   if (subResource === "iota-id") {
     if (rest.length !== 1) {
-      return sendError(origin, "Invalid user path", 1, { status: 400 });
+      return sendError(origin, {
+        status: 400,
+        logMessage: "Invalid user path",
+      });
     }
     return handleChangeIotaId(rest[0], request, origin);
   }
 
   if (subResource === "keys") {
     if (rest.length !== 1) {
-      return sendError(origin, "Invalid user path", 1, { status: 400 });
+      return sendError(origin, {
+        status: 400,
+        logMessage: "Invalid user path",
+      });
     }
     return handleChangeKeys(rest[0], request, origin);
   }
@@ -480,7 +455,7 @@ async function handleChangeRoutes(
     return handleChangeUser(subResource, request, origin);
   }
 
-  return sendError(origin, "Invalid user path", 1, { status: 400 });
+  return sendError(origin, { status: 400, logMessage: "Invalid user path" });
 }
 
 async function handleChangeIotaId(
@@ -506,13 +481,12 @@ async function handleChangeIotaId(
     user.token = assertString(body.new_token, "new_token");
 
     await updateUser(userId, user);
-    console.log("Updated iota id for user:", userId);
-    return sendSuccess(origin, "Changed iota id", 0);
+    return sendSuccess(origin);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return sendError(origin, `Failed to change iota id: ${message}`, 0, {
+    return sendError(origin, {
       error,
-      logMessage: "Failed to change iota id",
+      logMessage: message,
     });
   }
 }
@@ -551,12 +525,12 @@ async function handleChangeKeys(
     user.token = assertString(body.new_token, "new_token");
 
     await updateUser(userId, user);
-    return sendSuccess(origin, "Changed keys", 0);
+    return sendSuccess(origin);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return sendError(origin, `Failed to change keys: ${message}`, 0, {
+    return sendError(origin, {
       error,
-      logMessage: "Failed to change keys",
+      logMessage: message,
     });
   }
 }
@@ -620,15 +594,15 @@ async function handleChangeUser(
     }
 
     await updateUser(userId, user);
-    return sendSuccess(origin, "Changed user", 0, {
+    return sendSuccess(origin, {
       ...user,
       avatar: avatarToDataUri(user.avatar),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return sendError(origin, `Failed to change user: ${message}`, 0, {
+    return sendError(origin, {
       error,
-      logMessage: "Failed to change user",
+      logMessage: message,
     });
   }
 }
@@ -675,13 +649,13 @@ async function handleRegisterComplete(
     );
     userCreations.delete(userId);
 
-    return sendSuccess(origin, `Created User: ${userId}`, 0);
+    return sendSuccess(origin);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return sendError(origin, `User registration failed: ${message}`, 1, {
+    return sendError(origin, {
       status: 500,
       error,
-      logMessage: "User registration failed",
+      logMessage: message,
     });
   }
 }
@@ -702,13 +676,13 @@ async function handleDeleteUser(
     unwrap(
       await db.remove(userId, assertString(body.reset_token, "reset_token"))
     );
-    return sendSuccess(origin, `Deleted User: ${userId}`, 0);
+    return sendSuccess(origin);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return sendError(origin, `User deletion failed: ${message}`, 1, {
+    return sendError(origin, {
       status: 500,
       error,
-      logMessage: "User deletion failed",
+      logMessage: message,
     });
   }
 }
@@ -737,7 +711,7 @@ const handler = async (request: Request): Promise<Response> => {
   const segments = splitPathSegments(pathname);
 
   if (segments[0] !== "api") {
-    return sendError(origin, "Route not found", 1, { status: 404 });
+    return sendError(origin, { status: 404, logMessage: "Route not found" });
   }
 
   const resourceSegments = segments.slice(1);
@@ -761,29 +735,16 @@ const handler = async (request: Request): Promise<Response> => {
       return handleGetResource(resourceSegments.slice(1), request, origin);
     }
 
-    return sendError(origin, "Route not found", 1, { status: 404 });
+    return sendError(origin, { status: 404, logMessage: "Route not found" });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return sendError(origin, `Internal server error: ${message}`, 1, {
+    return sendError(origin, {
       status: 500,
       error,
-      logMessage: "Unhandled request error",
+      logMessage: message,
     });
   }
 };
-
-globalThis.addEventListener("error", (event) => {
-  const errorEvent = event as { error?: unknown; message?: string };
-  console.error(
-    "Unhandled error",
-    errorEvent.error ?? errorEvent.message ?? event
-  );
-});
-
-globalThis.addEventListener("unhandledrejection", (event) => {
-  const rejectionEvent = event as { reason?: unknown };
-  console.error("Unhandled promise rejection", rejectionEvent.reason);
-});
 
 const server = serve({
   hostname: "0.0.0.0",
