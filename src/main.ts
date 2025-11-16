@@ -464,7 +464,7 @@ async function handleGetCallToken(
 
     return sendSuccess(origin, {
       token: token.toJwt(),
-      server_url: "wss://methanium.net:7880",
+      server_url: "wss://methanium.net:7881",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
