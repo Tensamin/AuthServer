@@ -451,20 +451,16 @@ async function handleGetCallToken(
       {
         identity: userId,
         ttl: "10m",
-        metadata: JSON.stringify({ callId }),
       }
     );
 
     token.addGrant({
       roomJoin: true,
       room: callId,
-      canPublish: true,
-      canSubscribe: true,
     });
 
     return sendSuccess(origin, {
-      token: token.toJwt(),
-      server_url: "wss://call.tensamin.net",
+      token: await token.toJwt(),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
