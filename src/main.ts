@@ -3,6 +3,7 @@ import { serve } from "bun";
 import { Buffer } from "node:buffer";
 import { v7 } from "uuid";
 import sharp from "sharp";
+import { AccessToken } from "livekit-server-sdk";
 
 // Lib Imports
 import * as db from "./db";
@@ -417,7 +418,62 @@ async function handlePostRoutes(
     return handleDeleteUser(rest[0], request, origin);
   }
 
+  if (resource === "call_token" && rest.length === 1) {
+    return handleGetCallToken(request, origin);
+  }
+
   return null;
+}
+
+async function handleGetCallToken(
+  request: Request,
+  origin: string
+): Promise<Response> {
+  const body = await readJsonBody(request);
+
+  try {
+    if (!hasKeys(body, ["call_id", "user_id", "private_key_hash"])) {
+      throw new Error("Missing Values");
+    }
+
+    const callId = body.call_id as string;
+    const userId = body.user_id as string;
+    const privateKeyHash = body.private_key_hash;
+
+    const user = unwrapGet(await db.get(userId));
+    if (user.private_key_hash !== privateKeyHash) {
+      throw new Error("Permission Denied");
+    }
+
+    const token = new AccessToken(
+      process.env.LIVEKIT_API_KEY!,
+      process.env.LIVEKIT_API_SECRET!,
+      {
+        identity: userId,
+        ttl: "10m",
+        metadata: JSON.stringify({ callId }),
+      }
+    );
+
+    token.addGrant({
+      roomJoin: true,
+      room: callId,
+      canPublish: true,
+      canSubscribe: true,
+    });
+
+    return sendSuccess(origin, {
+      token: token.toJwt(),
+      server_url: "wss://methanium.net",
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return sendError(origin, {
+      status: 400,
+      error,
+      logMessage: message,
+    });
+  }
 }
 
 async function handleChangeRoutes(
