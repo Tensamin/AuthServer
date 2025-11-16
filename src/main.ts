@@ -418,7 +418,7 @@ async function handlePostRoutes(
     return handleDeleteUser(rest[0], request, origin);
   }
 
-  if (resource === "call_token" && rest.length === 1) {
+  if (resource === "call_token") {
     return handleGetCallToken(request, origin);
   }
 
