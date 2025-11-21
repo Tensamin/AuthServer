@@ -457,6 +457,7 @@ async function handleGetCallToken(
     token.addGrant({
       roomJoin: true,
       room: callId,
+      canUpdateOwnMetadata: true,
     });
 
     return sendSuccess(origin, {
