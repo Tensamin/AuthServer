@@ -22,6 +22,7 @@ const primaryOrigin = "https://app.tensamin.net";
 const allowedOrigins = new Set<string>([
   primaryOrigin,
   "http://localhost:3000",
+  "app://.",
 ]);
 
 const userCreations = new Set<string>();
