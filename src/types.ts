@@ -15,3 +15,8 @@ export type User = {
 };
 
 export type JsonRecord = Record<string, unknown>;
+
+export type BasicSuccessMessage = {
+  success: boolean;
+  message: string;
+};
