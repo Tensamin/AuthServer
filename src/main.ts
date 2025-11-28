@@ -8,13 +8,7 @@ import { AccessToken } from "livekit-server-sdk";
 // Lib Imports
 import * as db from "./db";
 import type { User, JsonRecord } from "./types";
-import {
-  hasKeys,
-  sanitizeUsername,
-  avatarToDataUri,
-  getChallenge,
-  verifyChallenge,
-} from "./utils";
+import { hasKeys, sanitizeUsername, avatarToDataUri } from "./utils";
 
 // Main
 if (typeof Bun === "undefined") {
@@ -245,10 +239,6 @@ async function handleGetRoutes(
     return null;
   }
 
-  if (resource === "challenge") {
-    return handleChallengeGet(rest, request, origin);
-  }
-
   if (resource === "get") {
     return handleGetResource(rest, request, origin);
   }
@@ -406,75 +396,6 @@ async function handleGetUserProfile(
   }
 }
 
-async function handleChallengeGet(
-  segments: string[],
-  request: Request,
-  origin: string
-): Promise<Response> {
-  if (segments.length !== 2 || segments[0] !== "get") {
-    return sendError(origin, {
-      status: 400,
-      logMessage: "Invalid challenge path",
-    });
-  }
-
-  try {
-    const userId = decodeURIComponent(segments[1]);
-    if (!userId) throw new Error("Missing user_id");
-
-    const payload = await getChallenge(userId);
-    return sendSuccess(origin, payload as unknown as JsonRecord);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return sendError(origin, { status: 400, error, logMessage: message });
-  }
-}
-
-async function handleChallengeVerify(
-  segments: string[],
-  request: Request,
-  origin: string
-): Promise<Response> {
-  if (segments.length !== 2 || segments[0] !== "verify") {
-    return sendError(origin, {
-      status: 400,
-      logMessage: "Invalid challenge path",
-    });
-  }
-
-  const body = await readJsonBody(request);
-
-  try {
-    if (!hasKeys(body, ["challenge", "signature"])) {
-      throw new Error("Missing Values");
-    }
-
-    const userId = decodeURIComponent(segments[1]);
-    const challenge = assertString(body.challenge, "challenge");
-    const signature = assertString(body.signature, "signature");
-
-    let publicKeyPem: string;
-    if (body.public_key) {
-      publicKeyPem = assertString(body.public_key, "public_key");
-    } else {
-      const user = unwrapGet(await db.get(userId));
-      publicKeyPem = user.public_key;
-    }
-
-    const result = await verifyChallenge(
-      userId,
-      challenge,
-      signature,
-      publicKeyPem
-    );
-
-    return sendSuccess(origin, result as unknown as JsonRecord);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return sendError(origin, { status: 400, error, logMessage: message });
-  }
-}
-
 async function handlePostRoutes(
   segments: string[],
   request: Request,
@@ -500,10 +421,6 @@ async function handlePostRoutes(
 
   if (resource === "call_token") {
     return handleGetCallToken(request, origin);
-  }
-
-  if (resource === "challenge") {
-    return handleChallengeVerify(rest, request, origin);
   }
 
   return null;
