@@ -140,6 +140,10 @@ function sendError(
   const { status = 500, error, logMessage } = options;
   const payload = {
     type: "error",
+    data: {
+      error,
+      logMessage,
+    },
   };
   return buildJsonResponse(payload, origin, status);
 }
