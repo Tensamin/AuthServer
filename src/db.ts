@@ -110,13 +110,12 @@ function normalizeAvatar(value: unknown): Uint8Array | null {
 
 function normalizeUserRow(row: Record<string, unknown>): User {
   return {
-    uuid: requireString(row.uuid, "uuid"),
+    id: toNumber(row.id),
     public_key: requireString(row.public_key, "public_key"),
     private_key_hash: requireString(row.private_key_hash, "private_key_hash"),
     iota_id: requireString(row.iota_id, "iota_id"),
     token: requireString(row.token, "token"),
     username: requireString(row.username, "username"),
-    created_at: toNumber(row.created_at),
     display: normalizeOptionalString(row.display),
     avatar: normalizeAvatar(row.avatar),
     about: normalizeOptionalString(row.about),
@@ -174,12 +173,11 @@ export async function init(): Promise<void> {
 async function createUsersTable(): Promise<void> {
   const sql = `
     CREATE TABLE IF NOT EXISTS users (
-      uuid VARCHAR(36) NOT NULL PRIMARY KEY,
+      id BIGINT NOT NULL PRIMARY KEY,
       username VARCHAR(15) NOT NULL UNIQUE,
       display VARCHAR(15),
       status VARCHAR(15),
       about VARCHAR(200),
-      created_at BIGINT NOT NULL,
       avatar MEDIUMBLOB,
       sub_level INT NOT NULL,
       sub_end BIGINT NOT NULL,
@@ -216,30 +214,28 @@ async function createOmikronUUIDsTable(): Promise<void> {
 }
 
 export async function add(
-  uuid: string,
+  id: number,
   public_key: string,
   private_key_hash: string,
   username: string,
   token: string,
-  iota_id: string,
-  created_at: number
+  iota_id: string
 ): Promise<string | Error> {
   try {
     const [result] = await ensurePool().execute<ResultSetHeader>(
       `
         INSERT INTO users (
-          uuid, public_key, private_key_hash, username, token, iota_id,
-          created_at, display, avatar, about, status, sub_level, sub_end
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+          id, public_key, private_key_hash, username, token, iota_id,
+          display, avatar, about, status, sub_level, sub_end
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
       [
-        uuid,
+        id,
         public_key,
         private_key_hash,
         username,
         token,
         iota_id,
-        created_at,
         "",
         null,
         "",
@@ -257,17 +253,17 @@ export async function add(
 }
 
 export async function remove(
-  uuid: string,
+  id: number,
   token: string
 ): Promise<string | Error> {
   try {
     const [rows] = await ensurePool().execute<RowDataPacket[]>(
-      "SELECT token FROM users WHERE uuid = ?",
-      [uuid]
+      "SELECT token FROM users WHERE id = ?",
+      [id]
     );
 
     if (rows.length === 0) {
-      return new Error("UUID not found.");
+      return new Error("ID not found.");
     }
 
     const row = rows[0] as RowDataPacket & { token: unknown };
@@ -275,36 +271,36 @@ export async function remove(
       return new Error("Bad Token");
     }
 
-    await ensurePool().execute("DELETE FROM users WHERE uuid = ?", [uuid]);
+    await ensurePool().execute("DELETE FROM users WHERE id = ?", [id]);
     return "Deleted User";
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
   }
 }
 
-export async function uuid(username: string): Promise<string | Error> {
+export async function id(username: string): Promise<number | Error> {
   try {
     const [rows] = await ensurePool().execute<RowDataPacket[]>(
-      "SELECT uuid FROM users WHERE username = ?",
+      "SELECT id FROM users WHERE username = ?",
       [username]
     );
 
     if (rows.length === 0) {
-      return new Error("UUID not found.");
+      return new Error("ID not found.");
     }
 
-    const row = rows[0] as RowDataPacket & { uuid: unknown };
-    return String(row.uuid);
+    const row = rows[0] as RowDataPacket & { id: unknown };
+    return toNumber(row.id);
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
   }
 }
 
-export async function get(uuid: string): Promise<User | null | Error> {
+export async function get(id: number): Promise<User | null | Error> {
   try {
     const [rows] = await ensurePool().execute<RowDataPacket[]>(
-      "SELECT * FROM users WHERE uuid = ?",
-      [uuid]
+      "SELECT * FROM users WHERE id = ?",
+      [id]
     );
 
     const row = rows?.[0] as RowDataPacket | undefined;
@@ -316,7 +312,7 @@ export async function get(uuid: string): Promise<User | null | Error> {
 }
 
 export async function update(
-  uuid: string,
+  id: number,
   data: Partial<User>
 ): Promise<boolean | Error> {
   try {
@@ -327,8 +323,8 @@ export async function update(
     if (!setExpr) return false;
 
     const [result] = await ensurePool().execute<ResultSetHeader>(
-      `UPDATE users SET ${setExpr} WHERE \`uuid\` = ?`,
-      [...values, uuid]
+      `UPDATE users SET ${setExpr} WHERE \`id\` = ?`,
+      [...values, id]
     );
 
     return (result.affectedRows ?? 0) > 0;

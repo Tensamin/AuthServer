@@ -1,7 +1,6 @@
 // Package Imports
 import { serve } from "bun";
 import { Buffer } from "node:buffer";
-import { v7 } from "uuid";
 import sharp from "sharp";
 import { AccessToken } from "livekit-server-sdk";
 
@@ -25,7 +24,7 @@ const allowedOrigins = new Set<string>([
   "app://.",
 ]);
 
-const userCreations = new Set<string>();
+const userCreations = new Set<number>();
 let isShuttingDown = false;
 
 function assertString(value: unknown, field: string): string {
@@ -49,7 +48,7 @@ function decodeBase64(input: string): Uint8Array {
 
 function toUserPayload(user: User): JsonRecord {
   const {
-    created_at,
+    id,
     username,
     display,
     avatar,
@@ -61,7 +60,7 @@ function toUserPayload(user: User): JsonRecord {
   } = user;
 
   return {
-    created_at,
+    id,
     username,
     display,
     avatar: avatarToDataUri(avatar),
@@ -173,8 +172,8 @@ async function adjustAvatar(
   }
 }
 
-async function updateUser(uuid: string, user: Partial<User>): Promise<void> {
-  unwrap(await db.update(uuid, user));
+async function updateUser(id: number, user: Partial<User>): Promise<void> {
+  unwrap(await db.update(id, user));
 }
 
 async function ensureOmikronAuth(authHeader: unknown): Promise<boolean> {
@@ -214,7 +213,7 @@ function splitPathSegments(pathname: string): string[] {
 }
 
 function handleRegisterInit(origin: string): Response {
-  const newUser = v7();
+  const newUser = Date.now();
   userCreations.add(newUser);
   setTimeout(() => {
     userCreations.delete(newUser);
@@ -262,14 +261,14 @@ async function handleGetResource(
   const [subResource, ...rest] = segments;
 
   switch (subResource) {
-    case "uuid":
+    case "id":
       if (rest.length !== 1) {
         return sendError(origin, {
           status: 400,
           logMessage: "Invalid username path",
         });
       }
-      return handleGetUuid(rest[0], origin);
+      return handleGetId(rest[0], origin);
     case "private-key-hash":
       if (rest.length !== 1) {
         return sendError(origin, {
@@ -297,24 +296,24 @@ async function handleGetResource(
   }
 }
 
-async function handleGetUuid(
+async function handleGetId(
   identifierSegment: string,
   origin: string
 ): Promise<Response> {
   const identifier = decodeURIComponent(identifierSegment);
-  const identifierLooksLikeUuid = /^[0-9a-fA-F-]{36}$/.test(identifier);
+  const identifierLooksLikeId = /^\d+$/.test(identifier);
 
   try {
-    if (identifierLooksLikeUuid) {
+    if (identifierLooksLikeId) {
       return sendSuccess(origin, {
-        user_id: identifier,
+        user_id: Number(identifier),
       });
     }
 
-    const result = await db.uuid(identifier);
-    const userUuid = unwrap<string>(result, "UUID lookup failed");
+    const result = await db.id(identifier);
+    const userId = unwrap<number>(result, "ID lookup failed");
     return sendSuccess(origin, {
-      user_id: userUuid,
+      user_id: userId,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -330,7 +329,7 @@ async function handleGetPrivateKeyHash(
   request: Request,
   origin: string
 ): Promise<Response> {
-  const userId = decodeURIComponent(userIdSegment);
+  const userId = Number(decodeURIComponent(userIdSegment));
 
   try {
     const authorization = request.headers.get("authorization");
@@ -359,7 +358,7 @@ async function handleGetIotaId(
   request: Request,
   origin: string
 ): Promise<Response> {
-  const userId = decodeURIComponent(userIdSegment);
+  const userId = Number(decodeURIComponent(userIdSegment));
 
   try {
     const authorization = request.headers.get("authorization");
@@ -386,7 +385,7 @@ async function handleGetUserProfile(
   userIdSegment: string,
   origin: string
 ): Promise<Response> {
-  const userId = decodeURIComponent(userIdSegment);
+  const userId = Number(decodeURIComponent(userIdSegment));
 
   try {
     const user = unwrapGet(await db.get(userId), "User not found");
@@ -442,7 +441,7 @@ async function handleGetCallToken(
     }
 
     const callId = body.call_id as string;
-    const userId = body.user_id as string;
+    const userId = Number(body.user_id);
     const privateKeyHash = body.private_key_hash;
 
     const user = unwrapGet(await db.get(userId));
@@ -454,7 +453,7 @@ async function handleGetCallToken(
       process.env.LIVEKIT_API_KEY!,
       process.env.LIVEKIT_API_SECRET!,
       {
-        identity: userId,
+        identity: String(userId),
         ttl: "10m",
       }
     );
@@ -521,7 +520,7 @@ async function handleChangeIotaId(
   request: Request,
   origin: string
 ): Promise<Response> {
-  const userId = decodeURIComponent(userIdSegment);
+  const userId = Number(decodeURIComponent(userIdSegment));
   const body = await readJsonBody(request);
 
   try {
@@ -554,7 +553,7 @@ async function handleChangeKeys(
   request: Request,
   origin: string
 ): Promise<Response> {
-  const userId = decodeURIComponent(userIdSegment);
+  const userId = Number(decodeURIComponent(userIdSegment));
   const body = await readJsonBody(request);
 
   try {
@@ -598,7 +597,7 @@ async function handleChangeUser(
   request: Request,
   origin: string
 ): Promise<Response> {
-  const userId = decodeURIComponent(userIdSegment);
+  const userId = Number(decodeURIComponent(userIdSegment));
   const body = await readJsonBody(request);
 
   try {
@@ -674,7 +673,7 @@ async function handleRegisterComplete(
   try {
     if (
       !hasKeys(body, [
-        "uuid",
+        "id",
         "username",
         "public_key",
         "private_key_hash",
@@ -688,10 +687,10 @@ async function handleRegisterComplete(
     const newUsername = sanitizeUsername(
       assertString(body.username, "username")
     );
-    const userId = assertString(body.uuid, "uuid");
+    const userId = Number(body.id);
 
     if (!userCreations.has(userId)) {
-      throw new Error("User creation failed due to invalid UUID");
+      throw new Error("User creation failed due to invalid ID");
     }
 
     unwrap(
@@ -701,8 +700,7 @@ async function handleRegisterComplete(
         assertString(body.private_key_hash, "private_key_hash"),
         newUsername,
         assertString(body.reset_token, "reset_token"),
-        assertString(body.iota_id, "iota_id"),
-        Date.now()
+        assertString(body.iota_id, "iota_id")
       )
     );
     userCreations.delete(userId);
@@ -723,7 +721,7 @@ async function handleDeleteUser(
   request: Request,
   origin: string
 ): Promise<Response> {
-  const userId = decodeURIComponent(userIdSegment);
+  const userId = Number(decodeURIComponent(userIdSegment));
   const body = await readJsonBody(request);
 
   try {
