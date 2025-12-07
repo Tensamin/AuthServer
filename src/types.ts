@@ -2,7 +2,7 @@ export type User = {
   id: number;
   public_key: string;
   private_key_hash: string;
-  iota_id: string;
+  iota_id: number;
   token: string;
   username: string;
   display?: string;

@@ -539,7 +539,7 @@ async function handleChangeIotaId(
       throw new Error("Permission Denied");
     }
 
-    user.iota_id = assertString(body.iota_id, "iota_id");
+    user.iota_id = body.iota_id as number;
     user.token = assertString(body.new_token, "new_token");
 
     await updateUser(userId, user);
@@ -705,7 +705,7 @@ async function handleRegisterComplete(
         assertString(body.private_key_hash, "private_key_hash"),
         newUsername,
         assertString(body.reset_token, "reset_token"),
-        assertString(body.iota_id, "iota_id")
+        body.iota_id as number
       )
     );
     userCreations.delete(userId);

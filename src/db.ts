@@ -113,7 +113,7 @@ function normalizeUserRow(row: Record<string, unknown>): User {
     id: toNumber(row.id),
     public_key: requireString(row.public_key, "public_key"),
     private_key_hash: requireString(row.private_key_hash, "private_key_hash"),
-    iota_id: requireString(row.iota_id, "iota_id"),
+    iota_id: toNumber(row.iota_id),
     token: requireString(row.token, "token"),
     username: requireString(row.username, "username"),
     display: normalizeOptionalString(row.display),
@@ -183,7 +183,7 @@ async function createUsersTable(): Promise<void> {
       sub_end BIGINT NOT NULL,
       public_key TEXT NOT NULL,
       private_key_hash VARCHAR(64) NOT NULL,
-      iota_id VARCHAR(36) NOT NULL,
+      iota_id BIGINT NOT NULL,
       token VARCHAR(256) NOT NULL UNIQUE
     );
   `;
@@ -219,7 +219,7 @@ export async function add(
   private_key_hash: string,
   username: string,
   token: string,
-  iota_id: string
+  iota_id: number
 ): Promise<string | Error> {
   try {
     const [result] = await ensurePool().execute<ResultSetHeader>(
