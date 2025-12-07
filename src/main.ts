@@ -3,6 +3,7 @@ import { serve } from "bun";
 import { Buffer } from "node:buffer";
 import sharp from "sharp";
 import { AccessToken } from "livekit-server-sdk";
+import * as Sentry from "@sentry/bun";
 
 // Lib Imports
 import * as db from "./db";
@@ -13,6 +14,10 @@ import { hasKeys, sanitizeUsername, avatarToDataUri } from "./utils";
 if (typeof Bun === "undefined") {
   throw new Error("This service requires the Bun runtime.");
 }
+
+Sentry.init({
+  dsn: "https://f78b74dd4d581032911e8f5c01d5a8c5@o4510490767851520.ingest.de.sentry.io/4510490775781456",
+});
 
 await db.init();
 
