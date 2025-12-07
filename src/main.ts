@@ -818,7 +818,7 @@ const server = serve({
 });
 
 console.log(
-  `> Started at http://${server.hostname}:${server.port} / https://auth.${primaryOrigin}`
+  `> Started at http://${server.hostname}:${server.port}`
 );
 
 const shutdown = async (): Promise<void> => {
