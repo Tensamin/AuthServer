@@ -1,6 +1,6 @@
 import { mysqlTable, int, varchar, text, customType } from 'drizzle-orm/mysql-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
-import { z } from 'zod';
+import type { z } from 'zod';
 
 export const users = mysqlTable('users', {
   id: int('id').primaryKey().autoincrement(),

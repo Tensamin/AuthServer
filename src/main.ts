@@ -2,7 +2,6 @@
 import { serve } from "bun";
 import { Buffer } from "node:buffer";
 import sharp from "sharp";
-import { AccessToken } from "livekit-server-sdk";
 import * as Sentry from "@sentry/bun";
 
 // Lib Imports
@@ -87,7 +86,9 @@ function resolveCorsOrigin(request: Request): string | null {
     if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
       return origin;
     }
-  } catch {}
+  } catch {
+    /* Ignore */
+  }
   return null;
 }
 
@@ -427,59 +428,7 @@ async function handlePostRoutes(
     return handleDeleteUser(rest[0], request, origin);
   }
 
-  if (resource === "call_token") {
-    return handleGetCallToken(request, origin);
-  }
-
   return null;
-}
-
-async function handleGetCallToken(
-  request: Request,
-  origin: string
-): Promise<Response> {
-  const body = await readJsonBody(request);
-
-  try {
-    if (!hasKeys(body, ["call_id", "user_id", "private_key_hash"])) {
-      throw new Error("Missing Values");
-    }
-
-    const callId = body.call_id as string;
-    const userId = Number(body.user_id);
-    const privateKeyHash = body.private_key_hash;
-
-    const user = unwrapGet(await db.get(userId));
-    if (user.private_key_hash !== privateKeyHash) {
-      throw new Error("Permission Denied");
-    }
-
-    const token = new AccessToken(
-      process.env.LIVEKIT_API_KEY!,
-      process.env.LIVEKIT_API_SECRET!,
-      {
-        identity: String(userId),
-        ttl: "10m",
-      }
-    );
-
-    token.addGrant({
-      roomJoin: true,
-      room: callId,
-      canUpdateOwnMetadata: true,
-    });
-
-    return sendSuccess(origin, {
-      token: await token.toJwt(),
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return sendError(origin, {
-      status: 400,
-      error,
-      logMessage: message,
-    });
-  }
 }
 
 async function handleChangeRoutes(
@@ -817,9 +766,7 @@ const server = serve({
   },
 });
 
-console.log(
-  `> Started at http://${server.hostname}:${server.port}`
-);
+console.log(`> Started at http://${server.hostname}:${server.port}`);
 
 const shutdown = async (): Promise<void> => {
   if (isShuttingDown) return;
